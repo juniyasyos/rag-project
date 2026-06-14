@@ -2,5 +2,3 @@ python-dotenv
 rich
 anthropic
 pyyaml
-llama-cpp-python 
-huggingface-hub

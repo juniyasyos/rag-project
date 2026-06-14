@@ -1,149 +1,261 @@
 import os
-import sys
+import re
 
-_llama_instance = None
 
-def get_llama_instance(model_path):
-    global _llama_instance
-    if _llama_instance is None:
-        try:
-            from llama_cpp import Llama
-            print(f"  🚀 Memuat model SLM lokal dari: {model_path} ...", file=sys.stderr)
-            _llama_instance = Llama(
-                model_path=model_path,
-                n_ctx=1536,
-                n_threads=4,
-                verbose=False
-            )
-        except ImportError:
-            print("  ⚠️  llama-cpp-python tidak terinstal.", file=sys.stderr)
-            return None
-    return _llama_instance
+# ============================================================
+# Caveman Librarian
+# Tidak pakai SLM.
+# Tidak jawab lokal.
+# Tidak panggil API besar.
+# Cuma metadata, key, route.
+# ============================================================
 
-def get_local_model_path():
-    local_model_path = os.getenv("LOCAL_MODEL_PATH", "").strip()
-    if not local_model_path:
-        default_path = os.path.join(os.getcwd(), "models", "qwen2.5-0.5b-instruct-q4_k_m.gguf")
-        if os.path.exists(default_path):
-            local_model_path = default_path
-    return local_model_path if (local_model_path and os.path.exists(local_model_path)) else None
+
+STOPWORDS = {
+    "apa", "itu", "yang", "di", "ke", "dari", "dan", "atau",
+    "untuk", "dengan", "pada", "dalam", "dong", "nih", "ya",
+    "saya", "aku", "kamu", "kau", "tolong"
+}
+
+
+def extract_query_keys(question: str) -> list[str]:
+    text = question.lower().strip()
+
+    words = re.findall(r"[a-zA-Z0-9_\-]+", text)
+
+    keys = []
+    for word in words:
+        if word in STOPWORDS:
+            continue
+        if len(word) < 2:
+            continue
+        keys.append(word)
+
+    return keys
+
+
+def detect_intent(question: str) -> str:
+    q = question.lower()
+
+    if any(x in q for x in ["rag", "graphrag", "knowledge", "knowledge base", "librarian"]):
+        return "rag_usage"
+
+    if any(x in q for x in ["command", "perintah", "migrate", "migration", "setup", "install", "jalankan", "run"]):
+        return "command_lookup"
+
+    if any(x in q for x in ["arsitektur", "architecture", "struktur", "modular", "monolith", "module"]):
+        return "architecture_analysis"
+
+    if "jelaskan" in q and any(x in q for x in ["project", "proyek", "siimut"]):
+        return "project_overview"
+
+    if any(x in q for x in ["dokumen", "docs", "file", "sumber"]):
+        return "docs_lookup"
+
+    return "docs_lookup"
+
+
+def expand_keys(question: str, query_keys: list[str]) -> list[str]:
+    q = question.lower()
+    expanded = []
+
+    def add(items: list[str]):
+        for item in items:
+            if item not in expanded:
+                expanded.append(item)
+
+    if "siimut" in q:
+        add([
+            "SIIMUT",
+            "Sistem Indikator Mutu",
+            "Rumah Sakit",
+            "Laravel 12",
+            "Filament",
+            "Filament 3.2",
+            "modular monolith",
+            "app/Modules",
+            "PROJECT_STRUCTURE",
+            "PROJECT_CONTEXT",
+        ])
+
+    if any(x in q for x in ["command", "perintah", "migrate", "migration", "setup", "install", "jalankan", "run"]):
+        add([
+            "COMMANDS.md",
+            "artisan",
+            "php artisan",
+            "php artisan migrate",
+            "database",
+            "setup development",
+        ])
+
+    if any(x in q for x in ["arsitektur", "architecture", "struktur", "modular", "monolith", "module"]):
+        add([
+            "PROJECT_STRUCTURE.md",
+            "modular monolith",
+            "app/Modules",
+            "Domain layer",
+            "Laravel structure",
+        ])
+
+    if any(x in q for x in ["rag", "graphrag", "knowledge", "knowledge base", "librarian"]):
+        add([
+            "GraphRAG",
+            "RAG",
+            "knowledge base",
+            "chunks",
+            "graph",
+            "librarian",
+            "handoff",
+        ])
+
+    return expanded
+
+
+def detect_route(question: str, intent: str, query_keys: list[str]) -> str:
+    q = question.lower().strip()
+
+    if not q or len(query_keys) == 0:
+        return "clarify"
+
+    if any(x in q for x in ["daftar dokumen", "dokumen apa", "sumber apa", "file apa", "lokasi file"]):
+        return "docs_only"
+
+    return "ai_agent"
+
+
+def calculate_confidence(intent: str, query_keys: list[str], relevant_docs: list[str]) -> float:
+    if intent == "unknown" or not query_keys:
+        return 0.4
+
+    doc_count = len(relevant_docs)
+
+    if doc_count >= 3:
+        return 0.85
+
+    if doc_count == 2:
+        return 0.75
+
+    if doc_count == 1:
+        return 0.6
+
+    return 0.5
+
+
+def clean_context_pack(context: str, max_chars: int = 1000) -> str:
+    if not context:
+        return ""
+
+    banned_patterns = [
+        "rag-project query",
+        "Retrieval-only",
+        "Retrieval Only",
+        "Contoh Query",
+        "[Retrieval Only",
+        "no LLM configured",
+        "klasifikasi singkat",
+        "kata_kunci1",
+        "kata_kunci2",
+        "intent pertanyaan",
+        "alasan",
+        "Tulis ringkasan",
+        "```txt",
+        "```",
+    ]
+
+    lines = context.splitlines()
+    clean_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+
+        if not stripped:
+            continue
+
+        if any(pattern.lower() in stripped.lower() for pattern in banned_patterns):
+            continue
+
+        # Buang tree dump
+        if stripped.startswith(("├", "│", "└", "─")):
+            continue
+
+        # Buang heading terlalu mentah tapi simpan isi penting
+        stripped = stripped.replace("#", "").strip()
+        stripped = stripped.replace("---", "").strip()
+
+        if not stripped:
+            continue
+
+        clean_lines.append(stripped)
+
+    text = " ".join(clean_lines)
+
+    # Rapikan spasi
+    text = re.sub(r"\s+", " ", text).strip()
+
+    # Potong aman
+    if len(text) > max_chars:
+        text = text[:max_chars].rsplit(" ", 1)[0].strip()
+
+    return text
+
+
+def build_librarian_metadata(
+    question: str,
+    context: str,
+    relevant_docs: list[str] | None = None,
+    relevant_topics: list[str] | None = None,
+) -> dict:
+    relevant_docs = relevant_docs or []
+    relevant_topics = relevant_topics or []
+
+    query_keys = extract_query_keys(question)
+    intent = detect_intent(question)
+    expanded_keys = expand_keys(question, query_keys)
+    route = detect_route(question, intent, query_keys)
+    confidence = calculate_confidence(intent, query_keys, relevant_docs)
+    context_pack = clean_context_pack(context)
+
+    return {
+        "user_query": question,
+        "intent": intent,
+        "query_keys": query_keys,
+        "expanded_keys": expanded_keys,
+        "route": route,
+        "confidence": confidence,
+        "relevant_docs": relevant_docs[:5],
+        "relevant_topics": relevant_topics[:8],
+        "context_pack": context_pack,
+        "notes": "Metadata dan konteks siap dikirim ke AI agent. RAG tidak menjawab final.",
+    }
+
+
+# ============================================================
+# Compatibility stubs
+# Supaya import lama tidak langsung error.
+# Tapi tidak dipakai untuk jawab.
+# ============================================================
+
 
 def llm_librarian(question: str, context: str) -> str | None:
-    local_model_path = get_local_model_path()
-    if local_model_path:
-        llm = get_llama_instance(local_model_path)
-        if llm:
-            try:
-                system_prompt = """Anda adalah Pustakawan Sistem (Router). Tugas Anda BUKAN menjawab secara detail.
-Keluarkan HANYA JSON valid. JANGAN cetak teks lain. Ganti nilai-nilai berikut dengan data SEBENARNYA berdasarkan konteks:
-{
-  "intent": "intent pertanyaan",
-  "can_answer_locally": true_atau_false,
-  "should_call_big_llm": true_atau_false,
-  "confidence": 0.0_hingga_1.0,
-  "relevant_docs": ["doc1"],
-  "relevant_topics": ["topic1"],
-  "answer_local": "jawaban singkat jika mudah",
-  "reason": "alasan"
-}"""
-                user_prompt = f"Konteks:\n{context}\n\nPertanyaan: {question}\n\nKeluarkan HANYA JSON valid."
-                
-                response = llm.create_chat_completion(
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    temperature=0.1,
-                    max_tokens=250
-                )
-                return response["choices"][0]["message"]["content"].strip()
-            except Exception as e:
-                print(f"  ⚠️  Gagal memanggil SLM lokal: {e}", file=sys.stderr)
-                return None
+    """
+    Deprecated.
+    Jangan pakai SLM untuk librarian.
+    Pakai build_librarian_metadata().
+    """
     return None
 
+
 def llm_answer(question: str, context: str) -> str | None:
-    local_model_path = get_local_model_path()
-    if local_model_path:
-        llm = get_llama_instance(local_model_path)
-        if llm:
-            try:
-                system_prompt = (
-                    "Anda adalah Pustakawan sistem lokal. Anda tidak bisa mengakses internet.\n"
-                    "Jawab pertanyaan berdasarkan konteks yang diberikan secara akurat dan to the point."
-                )
-                user_prompt = f"Konteks:\n{context}\n\nPertanyaan: {question}"
-                
-                response = llm.create_chat_completion(
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    temperature=0.1,  
-                    max_tokens=250
-                )
-                return response["choices"][0]["message"]["content"].strip()
-            except Exception as e:
-                print(f"  ⚠️  Gagal memanggil SLM lokal: {e}", file=sys.stderr)
-                return None
+    """
+    Disabled.
+    RAG tidak boleh menjawab lokal.
+    """
+    return None
 
-    # Fallback ke API eksternal (Anthropic-compatible) jika SLM lokal tidak ada
-    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip() or os.getenv("ANTHROPIC_AUTH_TOKEN", "").strip()
-    model = os.getenv("ANTHROPIC_MODEL", "").strip()
-    base_url = os.getenv("ANTHROPIC_BASE_URL", "").strip() or None
-
-    if not api_key or not model:
-        return None
-
-    try:
-        from anthropic import Anthropic
-    except ImportError:
-        return None
-
-    try:
-        client_kwargs = {"api_key": api_key}
-        if base_url: client_kwargs["base_url"] = base_url
-        client = Anthropic(**client_kwargs)
-        response = client.messages.create(
-            model=model,
-            system="Anda adalah Pustakawan sistem. Jawab secara akurat, singkat, dan to the point berdasarkan konteks.",
-            messages=[{"role": "user", "content": f"Konteks:\n{context}\n\nPertanyaan: {question}"}],
-            temperature=0.1, max_tokens=250,
-        )
-        return response.content[0].text.strip()
-    except Exception as e:
-        print(f"  ⚠️  LLM call failed: {e}", file=sys.stderr)
-        return None
 
 def llm_big_answer(question: str, context: str) -> str | None:
-    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip() or os.getenv("ANTHROPIC_AUTH_TOKEN", "").strip()
-    model = os.getenv("ANTHROPIC_MODEL", "").strip()
-    base_url = os.getenv("ANTHROPIC_BASE_URL", "").strip() or None
-
-    if not api_key or not model:
-        print("  ⚠️  Kredensial LLM Besar (Anthropic/Deepseek) tidak ditemukan di .env", file=sys.stderr)
-        return None
-
-    try:
-        from anthropic import Anthropic
-    except ImportError:
-        print("  ⚠️  anthropic package not installed.", file=sys.stderr)
-        return None
-
-    try:
-        client_kwargs = {"api_key": api_key}
-        if base_url: client_kwargs["base_url"] = base_url
-        client = Anthropic(**client_kwargs)
-        
-        print(f"  🌐 Memanggil LLM Besar ({model}) ...", file=sys.stderr)
-        
-        response = client.messages.create(
-            model=model,
-            system="Anda adalah asisten AI yang ahli dalam rekayasa perangkat lunak. Jawab pertanyaan pengguna secara detail dan analitis berdasarkan konteks yang diberikan.",
-            messages=[{"role": "user", "content": f"Konteks Ringkas:\n{context}\n\nPertanyaan: {question}\n\nTolong berikan penjelasan detail, analisa, atau instruksi berdasarkan konteks di atas."}],
-            temperature=0.3, max_tokens=2000,
-        )
-        return response.content[0].text.strip()
-    except Exception as e:
-        print(f"  ⚠️  Big LLM call failed: {e}", file=sys.stderr)
-        return None
+    """
+    Disabled.
+    RAG tidak boleh auto-call LLM besar.
+    """
+    return None

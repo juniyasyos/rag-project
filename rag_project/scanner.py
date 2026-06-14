@@ -124,17 +124,6 @@ def scan_file_with_config(filepath: Path, rel_path: str, domain: str, config: di
         "confidence": "derived_from_source"
     }
 
-    chunks.append({
-        "id": f"chunk-file-{rel_path.replace('/', '-')}",
-        "source_file": rel_path,
-        "domain": domain,
-        "content": content[:2000],
-        "heading": f"File: {rel_path}",
-        "source_hash": source_hash,
-        "last_indexed_commit": commit_hash,
-        "updated_at": updated_at
-    })
-
     file_id = rel_path.lower().replace("/", "-").replace(".", "-")
     
     rules = config.get("rules", [])

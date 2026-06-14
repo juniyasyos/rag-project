@@ -31,7 +31,7 @@ domains:
                 to: "col-{parent_1}-{2}"
                 type: "has_column"
   routes:
-    paths: ["routes"]
+    paths: ["routes", "app/Modules"]
     rules:
       - pattern: "Route::(get|post|put|patch|delete)\\('([^']+)'\\s*,\\s*\\[([^:]+)::class,\\s*'([^']+)'\\]"
         entities:
@@ -47,8 +47,17 @@ domains:
           - from: "route-{1_lower}-{2_slug}"
             to: "controller-{3_lower}"
             type: "handled_by"
+  controllers:
+    paths: ["app/Http/Controllers", "app/Modules"]
+    rules:
+      - pattern: "class\\s+([A-Za-z0-9_]+Controller)"
+        entities:
+          - id: "controller-{1_lower}"
+            type: "Controller"
+            label: "{1}"
+            domain: "{domain}"
   services:
-    paths: ["app/Services"]
+    paths: ["app/Services", "app/Modules"]
     rules:
       - pattern: "class\\s+([A-Za-z0-9_]+Service)"
         entities:
@@ -67,10 +76,19 @@ domains:
               - from: "service-{parent_1_lower}"
                 to: "service-{1_lower}"
                 type: "depends_on"
-  models:
-    paths: ["app/Models"]
+  repositories:
+    paths: ["app/Repositories", "app/Modules"]
     rules:
-      - pattern: "class\\s+([A-Za-z0-9_]+)\\s+extends\\s+Model"
+      - pattern: "class\\s+([A-Za-z0-9_]+Repository)"
+        entities:
+          - id: "repository-{1_lower}"
+            type: "Repository"
+            label: "{1}"
+            domain: "{domain}"
+  models:
+    paths: ["app/Models", "app/Modules"]
+    rules:
+      - pattern: "class\\s+([A-Za-z0-9_]+)\\s+extends\\s+(Model|Authenticatable)"
         entities:
           - id: "model-{1_lower}"
             type: "Model"
@@ -87,6 +105,45 @@ domains:
               - from: "model-{parent_1_lower}"
                 to: "model-{2_lower}"
                 type: "{1}"
+  filament:
+    paths: ["app/Filament", "app/Modules"]
+    rules:
+      - pattern: "class\\s+([A-Za-z0-9_]+Resource)\\s+extends\\s+Resource"
+        entities:
+          - id: "filament-resource-{1_lower}"
+            type: "FilamentResource"
+            label: "{1}"
+            domain: "{domain}"
+      - pattern: "class\\s+([A-Za-z0-9_]+Page)\\s+extends\\s+(Page|BasePage)"
+        entities:
+          - id: "filament-page-{1_lower}"
+            type: "FilamentPage"
+            label: "{1}"
+            domain: "{domain}"
+      - pattern: "class\\s+([A-Za-z0-9_]+Widget)\\s+extends\\s+(Widget|BaseWidget)"
+        entities:
+          - id: "filament-widget-{1_lower}"
+            type: "FilamentWidget"
+            label: "{1}"
+            domain: "{domain}"
+  commands:
+    paths: ["app/Console/Commands", "app/Modules"]
+    rules:
+      - pattern: "class\\s+([A-Za-z0-9_]+Command)\\s+extends\\s+Command"
+        entities:
+          - id: "command-{1_lower}"
+            type: "ConsoleCommand"
+            label: "{1}"
+            domain: "{domain}"
+  livewire:
+    paths: ["app/Livewire", "app/Modules"]
+    rules:
+      - pattern: "class\\s+([A-Za-z0-9_]+)\\s+extends\\s+Component"
+        entities:
+          - id: "livewire-{1_lower}"
+            type: "LivewireComponent"
+            label: "{1}"
+            domain: "{domain}"
   config:
     paths: ["config", "docker-compose.yml", "docker-compose.yaml", ".env.example"]
     rules:

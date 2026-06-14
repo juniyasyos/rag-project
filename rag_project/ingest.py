@@ -1,7 +1,7 @@
 import json
 import re
 from pathlib import Path
-from rag_project.paths import OUTPUT_DIR, CHUNKS_PATH, GRAPH_PATH
+from rag_project.paths import OUTPUT_DIR, CHUNKS_PATH, GRAPH_PATH, PROJECT_ROOT
 from rag_project.sync import collect_markdown_files
 from rag_project.graph import build_graph
 
@@ -23,8 +23,9 @@ def split_long_text(text: str, filename: str, heading: str, start_index: int) ->
         if not para: continue
         if buf_len + len(para) > MAX_CHUNK_SIZE and buffer:
             idx += 1
+            file_slug = filename.replace('/', '-').replace('.', '-')
             sub_chunks.append({
-                "id": f"chunk-{idx:04d}",
+                "id": f"chunk-{file_slug}-{idx:04d}",
                 "source_file": filename,
                 "heading": heading,
                 "chunk_index": idx,
@@ -38,8 +39,9 @@ def split_long_text(text: str, filename: str, heading: str, start_index: int) ->
 
     if buffer:
         idx += 1
+        file_slug = filename.replace('/', '-').replace('.', '-')
         sub_chunks.append({
-            "id": f"chunk-{idx:04d}",
+            "id": f"chunk-{file_slug}-{idx:04d}",
             "source_file": filename,
             "heading": heading,
             "chunk_index": idx,
@@ -70,8 +72,9 @@ def chunk_markdown(filename: str, content: str) -> list[dict]:
             chunk_counter += len(sub_chunks)
         else:
             chunk_counter += 1
+            file_slug = filename.replace('/', '-').replace('.', '-')
             chunks.append({
-                "id": f"chunk-{chunk_counter:04d}",
+                "id": f"chunk-{file_slug}-{chunk_counter:04d}",
                 "source_file": filename,
                 "heading": current_heading,
                 "topic": main_topic,
@@ -87,7 +90,7 @@ def chunk_markdown(filename: str, content: str) -> list[dict]:
             else:
                 heading_encountered = True
             current_heading = line.lstrip("#").strip()
-            current_lines = [line]
+            current_lines = []
         else:
             current_lines.append(line)
     if current_lines:
@@ -102,7 +105,11 @@ def run_ingest():
     
     files = []
     for f in collect_markdown_files():
-        files.append((f.name, f.read_text(encoding="utf-8")))
+        try:
+            rel_path = f.relative_to(PROJECT_ROOT).as_posix()
+        except ValueError:
+            rel_path = f.name
+        files.append((rel_path, f.read_text(encoding="utf-8")))
         
     all_chunks = []
     for filename, content in files:

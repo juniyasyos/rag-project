@@ -15,6 +15,7 @@ def main():
     parser.add_argument("arg", nargs="?", default="")
     parser.add_argument("--domain", type=str, help="Filter search by domain (e.g. docs, database, routes, services, models)")
     parser.add_argument("--mode", type=str, choices=["librarian", "handoff"], default="librarian", help="Mode for LLM processing")
+    parser.add_argument("--debug", action="store_true", help="Print debug information during query")
     args = parser.parse_args()
 
     if args.command == "sync":
@@ -30,7 +31,7 @@ def main():
         run_scan()
         write_metadata()
     elif args.command in ["query", "search"]:
-        run_query(args.arg, args.domain, args.mode)
+        run_query(args.arg, args.domain, args.mode, args.debug)
     elif args.command == "context":
         from rag_project.query import run_context
         print(run_context(args.arg, args.domain))
@@ -38,6 +39,25 @@ def main():
         import json
         try:
             with open(GRAPH_PATH, "r", encoding="utf-8") as f: graph = json.load(f)
+            if args.arg.lower() == "stats":
+                node_types = {}
+                for n in graph["nodes"]:
+                    ntype = n.get("type", "unknown")
+                    node_types[ntype] = node_types.get(ntype, 0) + 1
+                edge_types = {}
+                for e in graph["edges"]:
+                    etype = e.get("type", "unknown")
+                    edge_types[etype] = edge_types.get(etype, 0) + 1
+                
+                print("=== GRAPH STATS ===")
+                print(f"Total Nodes: {len(graph['nodes'])}")
+                print(f"Total Edges: {len(graph['edges'])}")
+                print("\nNode Types:")
+                for k, v in node_types.items(): print(f"  - {k}: {v}")
+                print("\nEdge Types:")
+                for k, v in edge_types.items(): print(f"  - {k}: {v}")
+                return
+                
             for n in graph["nodes"]:
                 if args.arg.lower() in n["label"].lower() or args.arg.lower() in n["id"].lower():
                     print(f"Node: {n}")
