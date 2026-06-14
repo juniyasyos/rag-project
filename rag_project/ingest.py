@@ -1,7 +1,8 @@
 import json
 import re
 from pathlib import Path
-from rag_project.paths import INPUT_DIR, OUTPUT_DIR, CHUNKS_PATH, GRAPH_PATH
+from rag_project.paths import OUTPUT_DIR, CHUNKS_PATH, GRAPH_PATH
+from rag_project.sync import collect_markdown_files
 from rag_project.graph import build_graph
 
 MAX_CHUNK_SIZE = 2000
@@ -53,6 +54,9 @@ def chunk_markdown(filename: str, content: str) -> list[dict]:
     current_lines = []
     chunk_counter = 0
     heading_encountered = False
+    
+    topic_match = re.search(r"^#\s+(.*)$", content, re.MULTILINE)
+    main_topic = topic_match.group(1).strip() if topic_match else "General"
 
     def flush():
         nonlocal chunk_counter
@@ -60,6 +64,8 @@ def chunk_markdown(filename: str, content: str) -> list[dict]:
         if not text: return
         if len(text) > MAX_CHUNK_SIZE:
             sub_chunks = split_long_text(text, filename, current_heading, chunk_counter)
+            for sc in sub_chunks:
+                sc["topic"] = main_topic
             chunks.extend(sub_chunks)
             chunk_counter += len(sub_chunks)
         else:
@@ -68,6 +74,7 @@ def chunk_markdown(filename: str, content: str) -> list[dict]:
                 "id": f"chunk-{chunk_counter:04d}",
                 "source_file": filename,
                 "heading": current_heading,
+                "topic": main_topic,
                 "chunk_index": chunk_counter,
                 "content": text,
             })
@@ -94,7 +101,7 @@ def run_ingest():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
     files = []
-    for f in sorted(INPUT_DIR.glob("*.md")):
+    for f in collect_markdown_files():
         files.append((f.name, f.read_text(encoding="utf-8")))
         
     all_chunks = []

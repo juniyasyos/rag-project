@@ -17,7 +17,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == "sync":
-        sync_docs()
+        print("  ℹ️  Command 'sync' is deprecated. RAG now reads directly from the docs without copying.")
     elif args.command == "ingest":
         run_ingest()
         write_metadata()
@@ -25,7 +25,6 @@ def main():
         run_scan()
         write_metadata()
     elif args.command in ["rebuild", "refresh"]:
-        sync_docs()
         run_ingest()
         run_scan()
         write_metadata()

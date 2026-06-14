@@ -27,6 +27,12 @@ def extract_entities(filename: str, content: str, all_nodes: dict[str, dict]) ->
     doc_id = f"doc-{filename.replace('.md', '').lower()}"
     _add_node(all_nodes, doc_id, "document", filename, filename)
 
+    topic_match = re.search(r"^#\s+(.*)$", content, re.MULTILINE)
+    if topic_match:
+        topic_name = topic_match.group(1).strip()
+        topic_id = f"topic-{re.sub(r'[^a-z0-9]', '-', topic_name.lower())}"
+        _add_node(all_nodes, topic_id, "topic", topic_name, filename)
+
     for match in re.finditer(r"^##\s+(.*)$", content, re.MULTILINE):
         sec_name = match.group(1).strip()
         sec_id = f"section-{filename}-{sec_name.lower().replace(' ', '-')}"
@@ -61,6 +67,12 @@ def extract_entities(filename: str, content: str, all_nodes: dict[str, dict]) ->
 
 def extract_edges(filename: str, content: str, nodes: dict[str, dict], edges: list[dict]) -> None:
     doc_id = f"doc-{filename.replace('.md', '').lower()}"
+
+    topic_match = re.search(r"^#\s+(.*)$", content, re.MULTILINE)
+    if topic_match:
+        topic_name = topic_match.group(1).strip()
+        topic_id = f"topic-{re.sub(r'[^a-z0-9]', '-', topic_name.lower())}"
+        _add_edge(edges, doc_id, topic_id, "has_topic", filename, nodes)
 
     for match in re.finditer(r"^##\s+(.*)$", content, re.MULTILINE):
         sec_name = match.group(1).strip()
