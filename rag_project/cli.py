@@ -14,6 +14,7 @@ def main():
     parser.add_argument("command", choices=["sync", "ingest", "scan", "search", "query", "graph", "inspect", "context", "refresh", "check", "rebuild"])
     parser.add_argument("arg", nargs="?", default="")
     parser.add_argument("--domain", type=str, help="Filter search by domain (e.g. docs, database, routes, services, models)")
+    parser.add_argument("--mode", type=str, choices=["librarian", "handoff"], default="librarian", help="Mode for LLM processing")
     args = parser.parse_args()
 
     if args.command == "sync":
@@ -29,7 +30,7 @@ def main():
         run_scan()
         write_metadata()
     elif args.command in ["query", "search"]:
-        run_query(args.arg, args.domain)
+        run_query(args.arg, args.domain, args.mode)
     elif args.command == "context":
         from rag_project.query import run_context
         print(run_context(args.arg, args.domain))
