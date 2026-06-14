@@ -22,7 +22,7 @@ def llm_answer(question: str, context: str) -> str | None:
         response = client.messages.create(
             model=model,
             system=(
-                "Anda adalah asisten yang menjawab pertanyaan tentang project SIIMUT.\n"
+                "Anda adalah asisten yang menjawab pertanyaan tentang project ini.\n"
                 "Jawab dalam bahasa Indonesia berdasarkan konteks."
             ),
             messages=[{"role": "user", "content": f"Konteks:\n{context}\n\nPertanyaan: {question}"}],

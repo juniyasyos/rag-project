@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "rag_project"
 version = "0.1.0"
-description = "GraphRAG knowledge base for SIIMUT"
+description = "GraphRAG knowledge base for the project"
 dependencies = [
     "python-dotenv",
     "rich",
