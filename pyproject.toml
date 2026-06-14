@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag_project"
+version = "0.1.0"
+description = "GraphRAG knowledge base for SIIMUT"
+dependencies = [
+    "python-dotenv",
+    "rich",
+    "anthropic",
+    "PyYAML"
+]
+
+[project.scripts]
+rag-project = "rag_project.cli:main"
+
+[tool.setuptools]
+packages = ["rag_project"]
