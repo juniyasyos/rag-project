@@ -1,29 +1,29 @@
-# Project RAG
+# Project Intelligence RAG
 
-**Project RAG** adalah sebuah package/tool generic untuk membangun *Retrieval-Augmented Generation* (RAG) secara lokal yang ringan dan berbasis file. Tool ini dirancang untuk dapat digunakan oleh berbagai macam project untuk membantu AI agent memahami konteks project dengan cepat dan efisien.
+**Project Intelligence RAG** adalah sebuah package/tool generic untuk membangun *Retrieval-Augmented Generation* (RAG) secara lokal yang ringan dan berbasis file. Tool ini dirancang untuk dapat digunakan oleh berbagai macam project untuk membantu AI agent memahami konteks project secara keseluruhan, bukan hanya dari dokumentasi, melainkan juga dari source code dan konfigurasi.
 
 ## 🌟 Problem yang Diselesaikan
 
-AI agent sering kali perlu membaca banyak dokumentasi untuk memahami konteks sebuah project. Memberikan seluruh file sumber atau folder dokumentasi (`docs/`) secara langsung sangat tidak efisien dan dapat dengan mudah melampaui batas token *context window* pada LLM.
+AI agent sering kali perlu membaca banyak dokumentasi dan source code untuk memahami arsitektur sebuah project. Mengirim seluruh file source atau folder dokumentasi secara langsung sangat tidak efisien dan dapat dengan mudah melampaui batas token *context window* pada LLM.
 
-Tool ini menyelesaikan masalah tersebut dengan mengekstrak dokumen markdown menjadi *chunks* yang terstruktur dan membangun *knowledge graph* sederhana secara lokal. AI agent kemudian dapat mencari konteks spesifik yang relevan tanpa harus membaca seluruh file dokumentasi project.
+Tool ini menyelesaikan masalah tersebut dengan melakukan *multi-domain scanning* (docs, database, routes, services, models, config/docker) dan membangun *knowledge graph* secara lokal. AI agent dapat mencari entitas (Table, Column, Migration, Route, Controller, Service, Model, dsb) atau konteks spesifik tanpa harus membaca seluruh file project.
 
 ## 🔄 Flow Sederhana
 
-Tool ini bekerja dengan alur yang sangat sederhana:
+Tool ini bekerja dengan alur yang modular:
 
-`docs/source files` → `sync` → `ingest` → `index/graph` → `agent context`
+`project files` → `scan/sync/ingest` → `index/graph` → `agent context`
 
-1. **Sync**: Mengambil file markdown dari folder dokumentasi project target.
-2. **Ingest**: Memecah file menjadi *chunks* dan mengekstrak relasi antar entitas (graph).
-3. **Index/Graph**: Menyimpan hasil pemrosesan secara lokal berbasis file (JSON).
-4. **Agent Context**: Menghasilkan ringkasan dan antarmuka pencarian agar AI agent mudah menggunakannya.
+1. **Scan & Sync**: Memindai berbagai domain di project (docs, app/Models, app/Services, database/migrations, routes, config) tanpa dependensi berat.
+2. **Ingest**: Mengekstrak entitas dan memecah konten menjadi *chunks* serta membangun *knowledge graph* sederhana.
+3. **Index/Graph**: Menyimpan hasil pemrosesan secara lokal berbasis file (JSON) di dalam folder `.ai/rag` milik project target.
+4. **Agent Context**: Menyediakan antarmuka CLI yang dapat digunakan AI agent untuk querying atau melihat struktur graph.
 
 ## 🚀 Quick Start
 
 ### 1. Install secara Lokal
 
-Clone repository package ini dan install secara global atau di *virtual environment*:
+Clone repository package ini dan install:
 
 ```bash
 pip install -e .
@@ -31,64 +31,65 @@ pip install -e .
 
 ### 2. Setup di Project Target
 
-Masuk ke direktori project target apa pun yang ingin diindeks (misalnya: project aplikasi web, service backend, dll).
+Masuk ke direktori project target apa pun yang ingin diindeks:
 
 ```bash
 cd /path/to/target-project
 ```
 
-Buat file konfigurasi `rag.yml` di root direktori project target. Contoh `rag.yml`:
-
-```yaml
-source_dir: "./docs"
-output_dir: "./.ai/rag"
-```
-
 ### 3. Build RAG & Cari Konteks
 
-Jalankan serangkaian perintah berikut dari dalam direktori project target:
+Jalankan perintah berikut dari dalam direktori project target:
 
 ```bash
-# Menyalin dokumentasi ke direktori input RAG
-project-rag sync
+# Melakukan scanning secara menyeluruh (multi-domain: code, config, docs)
+rag-project scan
 
-# Memecah dokumen menjadi chunks & membuat knowledge graph
-project-rag ingest
+# Menyalin markdown manual jika perlu
+rag-project sync
+rag-project ingest
 
-# Menghasilkan file AGENT_CONTEXT.md untuk panduan awal AI agent
-project-rag context
+# Gabungan scan, sync, ingest (rebuild ulang)
+rag-project refresh
 
-# Mencari konteks spesifik
-project-rag search "cara setup database lokal"
+# Menghasilkan context string untuk agent
+rag-project context "database setup"
+
+# Mencari file/chunk spesifik (bisa difilter berdasarkan domain)
+rag-project search "user authentication" --domain services
+
+# Melihat keseluruhan atau mencari sebagian dari Knowledge Graph
+rag-project graph "service"
+
+# Menginspeksi satu entitas Node secara detail
+rag-project inspect "model-user"
 ```
 
-## 📁 Contoh Struktur Project Target
+## 📁 Struktur Penyimpanan (di Project Target)
 
-Package RAG akan menyimpan seluruh data *index* dan *cache* di dalam *storage root* (misal: folder `.ai/rag/`) dari project target. Data pengguna sama sekali **tidak** disimpan di dalam package `project-rag` itu sendiri.
+Package ini menyimpan seluruh data *index* dan *cache* di dalam *storage root* `.ai/rag/` dari project target. Data pengguna sama sekali **tidak** disimpan di dalam package ini.
 
 ```text
 target-project/
+├── .ai/
+│   └── rag/                # Folder penyimpanan hasil RAG (output_dir)
+│       ├── input/          # Salinan file markdown (jika disinkronisasi manual)
+│       └── output/
+│           ├── chunks.json # Data potongan dokumen & kode
+│           └── graph.json  # Data entitas & relasi (Table, Route, Model, Service, dll)
 ├── docs/                   # Folder dokumentasi asli milik project
-│   ├── architecture.md
-│   └── setup.md
-├── src/                    # Source code project target
-├── rag.yml                 # Konfigurasi RAG untuk project ini
-└── .ai/
-    └── rag/                # Folder penyimpanan hasil RAG (output_dir)
-        ├── input/          # Salinan file markdown yang akan diproses
-        ├── output/
-        │   ├── chunks.json # Data potongan dokumen
-        │   └── graph.json  # Data entitas & relasi
-        └── AGENT_CONTEXT.md # File yang harus dibaca pertama kali oleh AI agent
+├── app/                    # Folder kode aplikasi
+└── config/                 # Folder konfigurasi
 ```
 
 ## 🤖 Cara AI Agent Memakai File Hasil Context
 
-AI agent yang ditugaskan pada project target harus membaca file hasil context terlebih dahulu.
+AI agent dapat berinteraksi dengan tool ini untuk mengeksplorasi arsitektur project:
 
-1. Agent melihat file `.ai/rag/AGENT_CONTEXT.md`. File ini berisi ringkasan struktur RAG dan direktori project.
-2. Jika butuh tahu cara setup database, agent dapat menjalankan perintah `project-rag search "database setup"` daripada membaca seluruh dokumen di `/docs`.
-3. Agent menggunakan hasil pencarian untuk melanjutkan tugasnya dengan konteks yang tepat sasaran.
+1. **Pencarian Global**: `rag-project search "jwt"` untuk melihat semua chunk code & docs terkait JWT.
+2. **Pencarian Spesifik Domain**: `rag-project search "create user" --domain routes` untuk membatasi pencarian di API/Web routes.
+3. **Graph Exploration**: `rag-project graph "model-user"` untuk melihat apa saja yang berhubungan dengan model User.
+4. **Detail Node**: `rag-project inspect "route-get-api-users"` untuk melihat relasi persis (misalnya controller apa yang menangani route tersebut).
 
 ## 📚 Dokumentasi Lanjutan
 

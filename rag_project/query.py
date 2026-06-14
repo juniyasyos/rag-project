@@ -9,15 +9,17 @@ def tokenize(text: str) -> set[str]:
     words = re.findall(r"[a-z0-9-]+", text.lower())
     return {w for w in words if len(w) > 2}
 
-def score_chunks(query: str, chunks: list[dict]) -> list[tuple[float, dict]]:
+def score_chunks(query: str, chunks: list[dict], domain: str = None) -> list[tuple[float, dict]]:
     q_tokens = tokenize(query)
     q_words = list(q_tokens)
     scored = []
     for chunk in chunks:
+        if domain and domain.lower() not in chunk.get("domain", chunk.get("source_file", "")).lower():
+            continue
         c_tokens = tokenize(chunk["content"])
         overlap = len(q_tokens & c_tokens)
         partial = sum(1 for qt in q_words for ct in c_tokens if qt in ct or ct in qt)
-        heading_boost = sum(2 for qt in q_words if qt in chunk["heading"].lower())
+        heading_boost = sum(2 for qt in q_words if qt in chunk.get("heading", "").lower())
         source_boost = sum(1 for qt in q_words if qt in chunk["source_file"].lower())
         score = overlap * 2 + partial + heading_boost + source_boost
         if score > 0:
@@ -25,10 +27,12 @@ def score_chunks(query: str, chunks: list[dict]) -> list[tuple[float, dict]]:
     scored.sort(key=lambda x: -x[0])
     return scored[:TOP_K]
 
-def score_graph(query: str, graph: dict) -> tuple[list[dict], list[dict]]:
+def score_graph(query: str, graph: dict, domain: str = None) -> tuple[list[dict], list[dict]]:
     q_tokens = tokenize(query)
     relevant_nodes = []
     for node in graph["nodes"]:
+        if domain and domain.lower() not in node.get("domain", node.get("source", "")).lower():
+            continue
         text = f"{node['id']} {node['label']} {node['type']}".lower()
         if q_tokens & tokenize(text):
             relevant_nodes.append(node)
@@ -41,31 +45,45 @@ def score_graph(query: str, graph: dict) -> tuple[list[dict], list[dict]]:
     return relevant_nodes, relevant_edges
 
 def build_context(chunks, nodes, edges) -> str:
-    parts = ["Berikut adalah konteks dari dokumentasi project:\n"]
-    parts.append("=== DOKUMEN ===")
+    parts = ["Berikut adalah konteks dari project intelligence:\n"]
+    parts.append("=== ENTITAS KODE / DOKUMEN ===")
     seen = set()
     for score, chunk in chunks:
-        header = f"[{chunk['source_file']}] {chunk['heading']}"
+        header = f"[{chunk['source_file']}] {chunk.get('heading', '')}"
         if header not in seen:
             seen.add(header)
             parts.append(f"\n{header}\n{chunk['content'][:1500]}")
     if nodes or edges:
-        parts.append("\n=== GRAF PENGETAHUAN ===")
+        parts.append("\n=== GRAF RELASI PENGETAHUAN ===")
         for n in nodes: parts.append(f"  • [{n['type']}] {n['label']} ({n['id']})")
         for e in edges: parts.append(f"  • {e['from']} --[{e['type']}]--> {e['to']}")
     return "\n".join(parts)
 
-def run_query(question: str):
-    import sys
+def load_data():
     try:
         with open(CHUNKS_PATH, "r", encoding="utf-8") as f: chunks = json.load(f)
+    except FileNotFoundError:
+        chunks = []
+    try:
         with open(GRAPH_PATH, "r", encoding="utf-8") as f: graph = json.load(f)
     except FileNotFoundError:
-        print("Run ingest first.")
+        graph = {"nodes": [], "edges": []}
+    return chunks, graph
+
+def run_context(question: str, domain: str = None) -> str:
+    chunks, graph = load_data()
+    top_chunks = score_chunks(question, chunks, domain)
+    rel_nodes, rel_edges = score_graph(question, graph, domain)
+    return build_context(top_chunks, rel_nodes, rel_edges)
+
+def run_query(question: str, domain: str = None):
+    chunks, graph = load_data()
+    if not chunks and not graph["nodes"]:
+        print("No data found. Run scan or ingest first.")
         return
     
-    top_chunks = score_chunks(question, chunks)
-    rel_nodes, rel_edges = score_graph(question, graph)
+    top_chunks = score_chunks(question, chunks, domain)
+    rel_nodes, rel_edges = score_graph(question, graph, domain)
     context = build_context(top_chunks, rel_nodes, rel_edges)
     answer = llm_answer(question, context)
     
@@ -75,13 +93,13 @@ def run_query(question: str):
     else:
         print("  [Retrieval Only — no LLM configured]\n")
         for i, (score, chunk) in enumerate(top_chunks, 1):
-            print(f"  [{i}] {chunk['source_file']} → {chunk['heading']} (Score: {score})\n      {chunk['content'][:200]}...")
+            print(f"  [{i}] {chunk['source_file']} → {chunk.get('heading', '')} (Score: {score})\n      {chunk['content'][:200]}...")
     if top_chunks:
         print("\n  Sumber:")
         seen = set()
         for _, c in top_chunks:
             if c['source_file'] not in seen:
-                print(f"    • docs/{c['source_file']}")
+                print(f"    • {c['source_file']}")
                 seen.add(c['source_file'])
     if rel_nodes or rel_edges:
         print("\n  Relasi Graph Terkait:")

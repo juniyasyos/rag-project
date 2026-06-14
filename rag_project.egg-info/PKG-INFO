@@ -1,8 +1,0 @@
-Metadata-Version: 2.4
-Name: rag_project
-Version: 0.1.0
-Summary: GraphRAG knowledge base for SIIMUT
-Requires-Dist: python-dotenv
-Requires-Dist: rich
-Requires-Dist: anthropic
-Requires-Dist: PyYAML

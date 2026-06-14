@@ -26,7 +26,7 @@ def load_or_create_config():
 
 config_data = load_or_create_config()
 
-RAG_DIR = PROJECT_ROOT / "rag"
+RAG_DIR = PROJECT_ROOT / "rag-project"
 DOCS_DIR = PROJECT_ROOT / config_data.get("docs_dir", "docs")
 INPUT_DIR = PROJECT_ROOT / config_data.get("input_dir", "docs/ai-agent/rag/input")
 OUTPUT_DIR = PROJECT_ROOT / config_data.get("output_dir", "docs/ai-agent/rag/output")

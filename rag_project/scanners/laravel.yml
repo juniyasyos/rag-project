@@ -1,0 +1,136 @@
+name: laravel
+domains:
+  database:
+    paths: ["database/migrations"]
+    rules:
+      - pattern: "Schema::create\\('([^']+)'"
+        entities:
+          - id: "table-{1}"
+            type: "Table"
+            label: "{1}"
+            domain: "{domain}"
+          - id: "{file_id}"
+            type: "Migration"
+            label: "{rel_path}"
+            domain: "{domain}"
+        relations:
+          - from: "{file_id}"
+            to: "table-{1}"
+            type: "creates_table"
+        sub_rules:
+          - pattern: "\\$table->([a-zA-Z0-9_]+)\\('([^']+)'\\)"
+            entities:
+              - id: "col-{parent_1}-{2}"
+                type: "Column"
+                label: "{2}"
+                domain: "{domain}"
+                metadata:
+                  col_type: "{1}"
+            relations:
+              - from: "table-{parent_1}"
+                to: "col-{parent_1}-{2}"
+                type: "has_column"
+  routes:
+    paths: ["routes"]
+    rules:
+      - pattern: "Route::(get|post|put|patch|delete)\\('([^']+)'\\s*,\\s*\\[([^:]+)::class,\\s*'([^']+)'\\]"
+        entities:
+          - id: "route-{1_lower}-{2_slug}"
+            type: "Route"
+            label: "{1_upper} {2}"
+            domain: "{domain}"
+          - id: "controller-{3_lower}"
+            type: "Controller"
+            label: "{3}"
+            domain: "controllers"
+        relations:
+          - from: "route-{1_lower}-{2_slug}"
+            to: "controller-{3_lower}"
+            type: "handled_by"
+  services:
+    paths: ["app/Services"]
+    rules:
+      - pattern: "class\\s+([A-Za-z0-9_]+Service)"
+        entities:
+          - id: "service-{1_lower}"
+            type: "Service"
+            label: "{1}"
+            domain: "{domain}"
+        sub_rules:
+          - pattern: "__construct\\([^)]*?([A-Za-z0-9_]+Repository|[A-Za-z0-9_]+Service)\\s+\\$[a-zA-Z0-9_]+\\)"
+            entities:
+              - id: "service-{1_lower}"
+                type: "Service"
+                label: "{1}"
+                domain: "{domain}"
+            relations:
+              - from: "service-{parent_1_lower}"
+                to: "service-{1_lower}"
+                type: "depends_on"
+  models:
+    paths: ["app/Models"]
+    rules:
+      - pattern: "class\\s+([A-Za-z0-9_]+)\\s+extends\\s+Model"
+        entities:
+          - id: "model-{1_lower}"
+            type: "Model"
+            label: "{1}"
+            domain: "{domain}"
+        sub_rules:
+          - pattern: "return\\s+\\$this->(hasMany|belongsTo|hasOne|belongsToMany)\\(([^:]+)::class"
+            entities:
+              - id: "model-{2_lower}"
+                type: "Model"
+                label: "{2}"
+                domain: "{domain}"
+            relations:
+              - from: "model-{parent_1_lower}"
+                to: "model-{2_lower}"
+                type: "{1}"
+  config:
+    paths: ["config", "docker-compose.yml", "docker-compose.yaml", ".env.example"]
+    rules:
+      - pattern: "^(.*)$" # Just match once to create the file node
+        limit: 1
+        entities:
+          - id: "{file_id}"
+            type: "ConfigFile"
+            label: "{rel_path}"
+            domain: "{domain}"
+      - pattern: "(?i)redis"
+        limit: 1
+        entities:
+          - id: "redis"
+            type: "Service"
+            label: "Redis"
+            domain: "infrastructure"
+        relations:
+          - from: "{file_id}"
+            to: "redis"
+            type: "configures"
+      - pattern: "(?i)mysql|mariadb"
+        limit: 1
+        entities:
+          - id: "mysql"
+            type: "Service"
+            label: "MySQL"
+            domain: "infrastructure"
+        relations:
+          - from: "{file_id}"
+            to: "mysql"
+            type: "configures"
+  docs:
+    paths: ["docs"]
+    rules:
+      - pattern: "\\*\\*ID\\*\\*:\\s*(KI-\\d+)"
+        entities:
+          - id: "{1_lower}"
+            type: "KnownIssue"
+            label: "{1}"
+            domain: "{domain}"
+      - pattern: "\\*\\*ID\\*\\*:\\s*(DEC-\\d+)"
+        entities:
+          - id: "{1_lower}"
+            type: "Decision"
+            label: "{1}"
+            domain: "{domain}"
