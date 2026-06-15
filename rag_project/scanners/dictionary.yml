@@ -209,6 +209,7 @@ intents:
 expanded_keys:
   siimut:
     - "SIIMUT"
+    - "SI-IMUT"
     - "Sistem Indikator Mutu"
     - "Rumah Sakit"
     - "mutu rumah sakit"
@@ -235,6 +236,7 @@ expanded_keys:
 
   service:
     - "App\\Services"
+    - "app/Services"
     - "service layer"
     - "business logic"
     - "Core services"

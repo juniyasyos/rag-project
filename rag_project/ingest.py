@@ -29,7 +29,7 @@ def split_long_text(text: str, filename: str, heading: str, start_index: int) ->
                 "source_file": filename,
                 "heading": heading,
                 "chunk_index": idx,
-                "content": "\n\n".join(buffer),
+                "content": re.sub(r"\s+", " ", " ".join(buffer).replace("\n", " ").replace("\r", " ")).strip(),
             })
             buffer = [para]
             buf_len = len(para)
@@ -45,7 +45,7 @@ def split_long_text(text: str, filename: str, heading: str, start_index: int) ->
             "source_file": filename,
             "heading": heading,
             "chunk_index": idx,
-            "content": "\n\n".join(buffer),
+            "content": re.sub(r"\s+", " ", " ".join(buffer).replace("\n", " ").replace("\r", " ")).strip(),
         })
     return sub_chunks
 
@@ -79,7 +79,7 @@ def chunk_markdown(filename: str, content: str) -> list[dict]:
                 "heading": current_heading,
                 "topic": main_topic,
                 "chunk_index": chunk_counter,
-                "content": text,
+                "content": re.sub(r"\s+", " ", text.replace("\n", " ").replace("\r", " ")).strip(),
             })
 
     for line in lines:
@@ -116,10 +116,10 @@ def run_ingest():
         all_chunks.extend(chunk_markdown(filename, content))
         
     with open(CHUNKS_PATH, "w", encoding="utf-8") as f:
-        json.dump(all_chunks, f, indent=2, ensure_ascii=False)
+        json.dump(all_chunks, f, separators=(',', ':'), ensure_ascii=False)
         
     graph = build_graph(files)
     with open(GRAPH_PATH, "w", encoding="utf-8") as f:
-        json.dump(graph, f, indent=2, ensure_ascii=False)
+        json.dump(graph, f, separators=(',', ':'), ensure_ascii=False)
         
     console.print(f"  Created {len(all_chunks)} chunks, {len(graph['nodes'])} nodes, {len(graph['edges'])} edges")

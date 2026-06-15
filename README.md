@@ -56,10 +56,13 @@ rag-project refresh
 rag-project context "database setup"
 
 # Melakukan query untuk mengambil konteks yang relevan (sebagai Pustakawan)
-rag-project query "jelaskan project siimut"
+rag-project query --intent project_overview
+
+# Melakukan query spesifik dengan target entity dan keywords
+rag-project query --intent service_lookup --entity LaporanImut --key migrate
 
 # Mencari file/chunk spesifik (bisa difilter berdasarkan domain)
-rag-project search "user authentication" --domain services
+rag-project search --intent docs_lookup --subject "user authentication" --domain services
 
 # Melihat keseluruhan atau mencari sebagian dari Knowledge Graph
 rag-project graph "service"

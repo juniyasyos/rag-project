@@ -3,23 +3,32 @@ from collections import OrderedDict
 
 def _add_node(nodes: dict, node_id: str, node_type: str, label: str,
               source: str, metadata: dict = None) -> None:
-    if node_id not in nodes:
-        nodes[node_id] = {
-            "id": node_id,
-            "type": node_type,
-            "label": label,
+    clean_id = node_id.lower().strip()
+    clean_type = node_type.lower().strip()
+    clean_label = label.replace("\n", "").replace("\r", "").strip()
+    clean_label = re.sub(r"\s+", " ", clean_label)
+    
+    if clean_id not in nodes:
+        nodes[clean_id] = {
+            "id": clean_id,
+            "type": clean_type,
+            "label": clean_label,
             "source": source,
         }
     if metadata:
-        nodes[node_id].update(metadata)
+        nodes[clean_id].update(metadata)
 
 def _add_edge(edges: list, from_id: str, to_id: str, rel_type: str,
               source: str, nodes: dict) -> None:
-    if from_id in nodes and to_id in nodes:
+    c_from = from_id.lower().strip()
+    c_to = to_id.lower().strip()
+    c_type = rel_type.lower().strip()
+    
+    if c_from in nodes and c_to in nodes:
         edges.append({
-            "from": from_id,
-            "to": to_id,
-            "type": rel_type,
+            "from": c_from,
+            "to": c_to,
+            "type": c_type,
             "source": source,
         })
 

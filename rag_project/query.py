@@ -2,23 +2,23 @@ import json
 import re
 import time
 from rag_project.paths import CHUNKS_PATH, GRAPH_PATH
-from rag_project.llm import llm_answer, llm_librarian, llm_big_answer
 
 TOP_K = 3  # Dikurangi agar context tidak terlalu besar untuk SLM
 
 def tokenize(text: str) -> set[str]:
+    if not text:
+        return set()
     words = re.findall(r"[a-z0-9-]+", text.lower())
     return {w for w in words if len(w) > 2}
 
-def score_chunks(query: str, query_keys: list[str], expanded_keys: list[str], preferred_sources: list[str], avoid_sources: list[str], chunks: list[dict], domain: str = None) -> list[tuple[float, dict]]:
+def score_chunks(intent: str, subject: str, entities: list[str], keys: list[str], preferred_sources: list[str], avoid_sources: list[str], chunks: list[dict], domains: list[str] = None, top_k: int = 3) -> list[tuple[float, dict]]:
     scored = []
-    
-    q_lower = query.lower()
     
     for chunk in chunks:
         source_file = chunk.get("source_file", "").lower()
-        if domain and domain.lower() not in chunk.get("domain", source_file):
-            continue
+        if domains:
+            if not any(d.lower() in chunk.get("domain", source_file).lower() for d in domains):
+                continue
             
         content_lower = chunk["content"].lower()
         heading_lower = chunk.get("heading", "").lower()
@@ -26,25 +26,23 @@ def score_chunks(query: str, query_keys: list[str], expanded_keys: list[str], pr
         
         score = 0
         
-        # 1. Exact phrase boost (+10)
-        if q_lower in full_text and len(q_lower) > 4:
+        # Boost based on explicit args
+        if subject and subject.lower() in full_text:
             score += 10
             
-        # 2. Keyword boost (+3)
-        for k in query_keys:
+        for e in entities:
+            if e.lower() in full_text:
+                score += 5
+                
+        for k in keys:
             if k.lower() in full_text:
                 score += 3
                 
-        # 3. Expanded key boost (+2)
-        for ek in expanded_keys:
-            if ek.lower() in full_text:
-                score += 2
-                
-        # 4. Preferred Source boost (+5)
+        # Preferred Source boost
         if any(ps.lower() in source_file for ps in preferred_sources):
             score += 5
             
-        # 5. Avoid Source penalty (-5)
+        # Avoid Source penalty
         if any(av.lower() in source_file for av in avoid_sources):
             score -= 5
             
@@ -52,14 +50,19 @@ def score_chunks(query: str, query_keys: list[str], expanded_keys: list[str], pr
             scored.append((score, chunk))
             
     scored.sort(key=lambda x: -x[0])
-    return scored[:TOP_K]
+    return scored[:top_k]
 
-def score_graph(query: str, graph: dict, domain: str = None) -> tuple[list[dict], list[dict]]:
-    q_tokens = tokenize(query)
+def score_graph(subject: str, entities: list[str], keys: list[str], graph: dict, domains: list[str] = None) -> tuple[list[dict], list[dict]]:
+    q_tokens = set()
+    if subject: q_tokens.update(tokenize(subject))
+    for e in entities: q_tokens.update(tokenize(e))
+    for k in keys: q_tokens.update(tokenize(k))
+    
     scored = []
     for node in graph["nodes"]:
-        if domain and domain.lower() not in node.get("domain", node.get("source", "")).lower():
-            continue
+        if domains:
+            if not any(d.lower() in node.get("domain", node.get("source", "")).lower() for d in domains):
+                continue
             
         n_id = node.get('id', '').lower()
         n_label = node.get('label', '').lower()
@@ -103,18 +106,18 @@ def score_graph(query: str, graph: dict, domain: str = None) -> tuple[list[dict]
     return relevant_nodes, relevant_edges[:15] # Batasi max 15 relasi
 
 def build_context(chunks, nodes) -> str:
-    parts = ["=== DOKUMEN RELEVAN ==="]
+    parts = ["DOKUMEN RELEVAN:"]
     seen = set()
     for score, chunk in chunks:
         header = f"[{chunk['source_file']}] {chunk.get('heading', '')}"
         if header not in seen:
             seen.add(header)
-            parts.append(f"\n{header}\n{chunk['content'][:500]}") # Batasi panjang konten per chunk
+            parts.append(f"{header}: {chunk['content'][:500]}") # Batasi panjang konten per chunk
     if nodes:
-        parts.append("\n=== TOPIK TERKAIT ===")
-        for n in nodes: parts.append(f"  • {n['label']} ({n['type']})")
+        parts.append("TOPIK TERKAIT:")
+        for n in nodes: parts.append(f"{n['label']} ({n['type']})")
     
-    context_str = "\n".join(parts)
+    context_str = " | ".join(parts)
     return context_str[:1500] # Maksimal 1500 karakter untuk menghemat token SLM
 
 def build_context_pack(chunks) -> str:
@@ -149,43 +152,42 @@ def load_data():
         graph = {"nodes": [], "edges": []}
     return chunks, graph
 
-def run_context(question: str, domain: str = None) -> str:
+def run_context(question: str, domains: list[str] = None) -> str:
     chunks, graph = load_data()
-    from rag_project.llm import extract_query_keys, detect_intent, expand_keys, load_dictionary
-    dictionary = load_dictionary()
-    qk = extract_query_keys(question)
-    ek = expand_keys(question, qk)
-    intent = detect_intent(question)
     
-    intents = dictionary.get("intents", {})
-    intent_data = intents.get(intent, {})
-    preferred_sources = intent_data.get("preferred_sources", [])
-    avoid_sources = intent_data.get("avoid_sources", [])
+    # Fallback default route for simple context command
+    preferred_sources = []
+    avoid_sources = []
     
-    top_chunks = score_chunks(question, qk, ek, preferred_sources, avoid_sources, chunks, domain)
-    rel_nodes, _ = score_graph(question, graph, domain)
+    # For backward compat, use the question as a key
+    top_chunks = score_chunks("docs_lookup", question, [], [], preferred_sources, avoid_sources, chunks, domains)
+    rel_nodes, _ = score_graph(question, [], [], graph, domains)
     return build_context(top_chunks, rel_nodes)
 
-def run_query(question: str, domain: str = None, mode: str = "librarian", debug: bool = False):
+def run_query(intent: str, subject: str, entities: list[str], keys: list[str], domains: list[str], top_k: int, mode: str, debug: bool):
     chunks, graph = load_data()
     if not chunks and not graph["nodes"]:
         print("No data found. Run scan or ingest first.")
         return
     
-    from rag_project.llm import extract_query_keys, detect_intent, expand_keys, load_dictionary
-    dictionary = load_dictionary()
+    route_config = {
+        "project_overview": {"read_first": ["docs"], "read_if_needed": ["README", "ARCHITECTURE"], "avoid_first": ["services", "models", "routes"]},
+        "architecture_analysis": {"read_first": ["docs", "services", "modules"], "read_if_needed": ["config"], "avoid_first": ["migrations"]},
+        "service_lookup": {"read_first": ["services", "entities", "models"], "read_if_needed": ["repositories"], "avoid_first": ["routes", "docs"]},
+        "data_model_lookup": {"read_first": ["models", "migrations"], "read_if_needed": ["database", "schema"], "avoid_first": ["routes", "services"]},
+        "command_lookup": {"read_first": ["COMMANDS", "README"], "read_if_needed": ["scripts", "package.json"], "avoid_first": ["models", "services"]},
+        "api_reference": {"read_first": ["routes", "controllers"], "read_if_needed": ["middlewares", "requests"], "avoid_first": ["models", "migrations"]},
+        "troubleshooting": {"read_first": ["KNOWN_ISSUES", "CHANGELOG"], "read_if_needed": ["logs", "exceptions"], "avoid_first": ["docs", "README"]},
+        "rag_usage": {"read_first": ["rag"], "read_if_needed": ["config"], "avoid_first": ["services", "models"]},
+        "docs_lookup": {"read_first": ["docs"], "read_if_needed": [], "avoid_first": []}
+    }
     
-    query_keys = extract_query_keys(question)
-    intent = detect_intent(question)
-    expanded_keys = expand_keys(question, query_keys)
+    mapping = route_config.get(intent, {"read_first": [], "read_if_needed": [], "avoid_first": []})
+    preferred_sources = mapping["read_first"]
+    avoid_sources = mapping["avoid_first"]
     
-    intents = dictionary.get("intents", {})
-    intent_data = intents.get(intent, {})
-    preferred_sources = intent_data.get("preferred_sources", [])
-    avoid_sources = intent_data.get("avoid_sources", [])
-    
-    top_chunks = score_chunks(question, query_keys, expanded_keys, preferred_sources, avoid_sources, chunks, domain)
-    rel_nodes, rel_edges = score_graph(question, graph, domain)
+    top_chunks = score_chunks(intent, subject, entities, keys, preferred_sources, avoid_sources, chunks, domains, top_k)
+    rel_nodes, rel_edges = score_graph(subject, entities, keys, graph, domains)
     context = build_context(top_chunks, rel_nodes)
     
     if debug:
@@ -199,19 +201,18 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
     
     start_time = time.time()
     
-    combined_keys = " ".join(query_keys).lower() + " " + question.lower()
-        
-    # 4. Route (Deterministic)
-    if any(k in combined_keys for k in ["dimana", "lokasi", "daftar", "sumber", "file"]):
+    # Route logic based on intent
+    if intent in ["project_overview", "docs_lookup", "command_lookup"]:
         route = "docs_only"
-    elif len(query_keys) <= 1:
-        route = "clarify"
+    elif intent in ["service_lookup", "data_model_lookup", "api_reference"]:
+        route = "code_lookup"
     else:
         route = "ai_agent"
         
-    # Kumpulkan data dokumen (Deterministic)
     relevant_docs = list(set(c['source_file'] for _, c in top_chunks))
-    
+    for node in rel_nodes:
+        if 'source' in node and node['source'] not in relevant_docs:
+            relevant_docs.append(node['source'])
     relevant_topics = list(set(n['label'] for n in rel_nodes))
     for edge in rel_edges:
         rel_str = f"{edge['from_label']} --[{edge['type']}]--> {edge['to_label']}"
@@ -219,26 +220,19 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
             relevant_topics.append(rel_str)
             
     context_pack = build_context_pack(top_chunks)
+    if not context_pack and relevant_topics:
+        # Fallback for code_lookup when only graph nodes match
+        clean_topics = [t.strip().replace('\n', '').replace('  ', ' ') for t in relevant_topics if t.strip()]
+        context_pack = "Nodes/Relations: " + " | ".join(clean_topics[:10])
     
-    # 5. Confidence (Deterministic)
-    if intent == "docs_lookup" or len(query_keys) == 0:
-        confidence = 0.4
-    else:
-        doc_count = len(relevant_docs)
-        if doc_count >= 3:
-            confidence = 0.85
-        elif doc_count == 2:
-            confidence = 0.75
-        elif doc_count == 1:
-            confidence = 0.60
-        else:
-            confidence = 0.4
+    confidence = 0.85 if len(relevant_docs) >= 1 else 0.4
     
     final_data = {
-        "user_query": question,
         "intent": intent,
-        "query_keys": query_keys,
-        "expanded_keys": expanded_keys,
+        "subject": subject,
+        "entities": entities,
+        "keys": keys,
+        "domains": domains,
         "route": route,
         "confidence": confidence,
         "relevant_docs": relevant_docs,
@@ -246,7 +240,11 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
         "context_pack": context_pack,
     }
     
+    if mode == "handoff":
+        final_data["read_first"] = mapping["read_first"]
+        final_data["read_if_needed"] = mapping["read_if_needed"]
+        final_data["avoid_first"] = mapping["avoid_first"]
+    
     elapsed = time.time() - start_time
     
-    if mode == "librarian" or mode == "handoff":
-        print(json.dumps(final_data, indent=2))
+    print(json.dumps(final_data, separators=(',', ':')))

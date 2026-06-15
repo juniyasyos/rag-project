@@ -13,13 +13,18 @@ def main():
     parser = argparse.ArgumentParser(description="Project Intelligence RAG CLI")
     parser.add_argument("command", choices=["sync", "ingest", "scan", "search", "query", "graph", "inspect", "context", "refresh", "check", "rebuild"])
     parser.add_argument("arg", nargs="?", default="")
-    parser.add_argument("--domain", type=str, help="Filter search by domain (e.g. docs, database, routes, services, models)")
-    parser.add_argument("--mode", type=str, choices=["librarian", "handoff"], default="librarian", help="Mode for LLM processing")
+    parser.add_argument("--intent", type=str, help="Intent of the query (e.g. project_overview, service_lookup)")
+    parser.add_argument("--subject", type=str, help="Subject of the query")
+    parser.add_argument("--entity", type=str, action="append", help="Entity related to the query")
+    parser.add_argument("--key", type=str, action="append", help="Key for search")
+    parser.add_argument("--domain", type=str, action="append", help="Filter search by domain (e.g. docs, database, routes, services, models)")
+    parser.add_argument("--top", type=int, default=3, help="Top K chunks to retrieve")
+    parser.add_argument("--mode", type=str, choices=["librarian", "handoff"], default="librarian", help="Mode for output (librarian, handoff)")
     parser.add_argument("--debug", action="store_true", help="Print debug information during query")
     args = parser.parse_args()
 
     if args.command == "sync":
-        print("  ℹ️  Command 'sync' is deprecated. RAG now reads directly from the docs without copying.")
+        print("  Command 'sync' is deprecated. RAG now reads directly from the docs without copying.")
     elif args.command == "ingest":
         run_ingest()
         write_metadata()
@@ -31,10 +36,36 @@ def main():
         run_scan()
         write_metadata()
     elif args.command in ["query", "search"]:
-        run_query(args.arg, args.domain, args.mode, args.debug)
+        if not args.intent:
+            print("Error: --intent is required for query/search.")
+            print("Examples:")
+            print("  rag query --intent project_overview")
+            print("  rag query --intent service_lookup --entity LaporanImut --key migrate")
+            sys.exit(1)
+        
+        valid_intents = [
+            "project_overview", "architecture_analysis", "service_lookup", 
+            "data_model_lookup", "command_lookup", "api_reference", 
+            "troubleshooting", "rag_usage", "docs_lookup"
+        ]
+        if args.intent not in valid_intents:
+            print(f"Error: Invalid intent '{args.intent}'.\nValid intents: {', '.join(valid_intents)}")
+            sys.exit(1)
+            
+        run_query(
+            intent=args.intent,
+            subject=args.subject,
+            entities=args.entity or [],
+            keys=args.key or [],
+            domains=args.domain or [],
+            top_k=args.top,
+            mode=args.mode,
+            debug=args.debug
+        )
     elif args.command == "context":
         from rag_project.query import run_context
-        print(run_context(args.arg, args.domain))
+        # Use arg as subject or intent for backwards compat, though context command should be updated too
+        print(run_context(args.arg, args.domain and [args.domain] or []))
     elif args.command == "graph":
         import json
         try:

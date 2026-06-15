@@ -9,22 +9,27 @@ from pathlib import Path
 from rag_project.paths import PROJECT_ROOT, CHUNKS_PATH, GRAPH_PATH
 
 def _add_node(nodes: dict, node_id: str, node_type: str, label: str, source: str, domain: str, metadata: dict = None) -> None:
-    if node_id not in nodes:
-        nodes[node_id] = {
-            "id": node_id,
-            "type": node_type,
-            "label": label,
+    clean_id = node_id.lower().strip()
+    clean_type = node_type.lower().strip()
+    clean_label = label.replace("\n", "").replace("\r", "").strip()
+    clean_label = re.sub(r"\s+", " ", clean_label)
+    
+    if clean_id not in nodes:
+        nodes[clean_id] = {
+            "id": clean_id,
+            "type": clean_type,
+            "label": clean_label,
             "source": source,
             "domain": domain
         }
     if metadata:
-        nodes[node_id].update(metadata)
+        nodes[clean_id].update(metadata)
 
 def _add_edge(edges: list, from_id: str, to_id: str, rel_type: str, source: str) -> None:
     edges.append({
-        "from": from_id,
-        "to": to_id,
-        "type": rel_type,
+        "from": from_id.lower().strip(),
+        "to": to_id.lower().strip(),
+        "type": rel_type.lower().strip(),
         "source": source
     })
 
@@ -190,7 +195,7 @@ def run_scan():
     
     CHUNKS_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(CHUNKS_PATH, "w", encoding="utf-8") as f:
-        json.dump(final_chunks, f, indent=2, ensure_ascii=False)
+        json.dump(final_chunks, f, separators=(',', ':'), ensure_ascii=False)
         
     final_graph = {"nodes": list(nodes.values()), "edges": edges}
     if GRAPH_PATH.exists():
@@ -213,6 +218,6 @@ def run_scan():
             pass
             
     with open(GRAPH_PATH, "w", encoding="utf-8") as f:
-        json.dump(final_graph, f, indent=2, ensure_ascii=False)
+        json.dump(final_graph, f, separators=(',', ':'), ensure_ascii=False)
         
     console.print(f"  Scanned {files_scanned} files. Found {len(nodes)} entities and {len(edges)} relations.")
