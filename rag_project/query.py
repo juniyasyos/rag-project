@@ -182,14 +182,9 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
     fallback_query_keys = [w for w in q_lower.split() if len(w) > 2]
     
     # 2. Intent - Kompleks Rule-Based
-    intent_rules = {
-        "project_overview": ["jelaskan project", "apa itu", "tentang siimut", "ringkasan", "overview", "tujuan"],
-        "command_lookup": ["command", "perintah", "migrate", "setup", "install", "menjalankan", "start", "artisan", "run"],
-        "architecture_analysis": ["arsitektur", "struktur", "modular", "monolith", "alur", "flow", "desain", "database", "skema"],
-        "rag_usage": ["rag", "graphrag", "knowledge", "pustakawan", "ai agent", "chunk", "ingest", "search"],
-        "troubleshooting": ["error", "bug", "gagal", "masalah", "issue", "troubleshoot", "log"],
-        "api_reference": ["api", "endpoint", "route", "controller", "response", "request"],
-    }
+    from rag_project.llm import load_dictionary
+    dictionary = load_dictionary()
+    intent_rules = dictionary.get("intents", {})
     
     fallback_intent = "docs_lookup"
     for intent_key, keywords in intent_rules.items():
@@ -221,15 +216,7 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
     expanded_keys = []
     combined_keys = " ".join(query_keys).lower() + " " + q_lower
     
-    expanded_keys_rules = {
-        "siimut": ["SIIMUT", "Sistem Indikator Mutu", "Laravel 12", "Filament", "modular monolith"],
-        "migrate": ["artisan migrate", "database", "COMMANDS.md", "schema", "table"],
-        "rag": ["GraphRAG", "knowledge base", "chunks", "graph", "librarian", "AI_AGENT_USAGE.md"],
-        "filament": ["admin panel", "Livewire", "resource", "table", "form", "dashboard"],
-        "error": ["KNOWN_ISSUES.md", "TROUBLESHOOTING.md", "log", "bug", "exception"],
-        "api": ["routes/api.php", "controller", "endpoint", "json"],
-        "docker": ["docker-compose", "container", "sail", "image", "deployment"]
-    }
+    expanded_keys_rules = dictionary.get("expanded_keys", {})
     
     for kw, exp_keys in expanded_keys_rules.items():
         if kw in combined_keys:

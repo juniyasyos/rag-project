@@ -16,7 +16,6 @@ rag-project/
 │   ├── ingest.py          # Logika pemecahan chunk & ekstrak graph (markdown)
 │   ├── scanner.py         # Multi-domain scanner (database, routes, services, dll)
 │   ├── graph.py           # Struktur data / index untuk graph entities
-│   ├── llm.py             # Opsional LLM integration
 │   └── query.py           # Modul pencarian keyword dan context generation
 ├── docs/                  # Dokumentasi tool ini sendiri
 ├── README.md

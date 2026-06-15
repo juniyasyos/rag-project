@@ -9,7 +9,6 @@ description = "GraphRAG knowledge base for the project"
 dependencies = [
     "python-dotenv",
     "rich",
-    "anthropic",
     "PyYAML"
 ]
 

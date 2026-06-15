@@ -140,16 +140,18 @@ def run_scan():
     
     scanners_dir = Path(__file__).parent / "scanners"
     configs = []
-    if scanners_dir.exists():
-        for f in scanners_dir.glob("*.yml"):
-            try:
-                with open(f, "r", encoding="utf-8") as yf:
-                    configs.append(yaml.safe_load(yf))
-            except Exception as e:
-                console.print(f"[red]Error loading scanner config {f}: {e}[/red]")
+    scanner_name = os.environ.get("RAG_SCANNER", "laravel")
+    scanner_file = scanners_dir / f"{scanner_name}.yml"
+    
+    if scanner_file.exists():
+        try:
+            with open(scanner_file, "r", encoding="utf-8") as yf:
+                configs.append(yaml.safe_load(yf))
+        except Exception as e:
+            console.print(f"[red]Error loading scanner config {scanner_file}: {e}[/red]")
                 
     if not configs:
-        console.print("[yellow]No scanner configs found in scanners directory.[/yellow]")
+        console.print(f"[yellow]Scanner config {scanner_name}.yml not found in scanners directory.[/yellow]")
         return
         
     for config in configs:

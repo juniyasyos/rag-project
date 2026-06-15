@@ -13,7 +13,7 @@ GraphRAG adalah sistem knowledge base ringan yang:
 
 1. **Sync** — Menyalin dokumentasi dari `docs/` ke `docs/ai-agent/rag/input/`
 2. **Ingest** — Memecah dokumen jadi chunk + mengekstrak grafik pengetahuan
-3. **Query** — Menjawab pertanyaan dengan keyword scoring + LLM opsional (Claude)
+3. **Query** — Mengekstrak konteks relevan berdasarkan keyword scoring
 
 **Tujuan**: Memudahkan developer (manusia dan AI) untuk mencari informasi
 tentang project tanpa harus membaca puluhan file dokumentasi manual.
@@ -80,13 +80,7 @@ Membaca semua markdown dari `docs/ai-agent/rag/input/` dan menghasilkan:
 ### 4. Query
 
 ```bash
-# Retrieval-only (tanpa LLM)
 rag-project query "apa itu modular monolith?"
-
-# Dengan LLM (copy .env dulu)
-cp rag/.env.example rag/.env
-# Isi ANTHROPIC_API_KEY dan ANTHROPIC_MODEL
-rag-project query "command apa untuk setup development?"
 ```
 
 ---
@@ -152,7 +146,7 @@ Object dengan nodes dan edges:
 1. Tokenize pertanyaan
 2. Score chunk berdasar keyword overlap + heading boost + source boost
 3. Cari node/edge graph relevan
-4. (Opsional) Kirim konteks ke Claude untuk jawaban natural language
+
 
 ---
 
@@ -161,7 +155,7 @@ Object dengan nodes dan edges:
 1. **Pattern-based graph** — hanya entitas eksplisit dengan kata kunci
 2. **Source code tidak diindeks** — hanya markdown di `docs/`
 3. **Keyword scoring** — tanpa semantic search / embedding
-4. **LLM opsional** — tanpa API key, hanya retrieval
+4. **No LLM** — sistem murni berfungsi sebagai pustakawan (pencari konteks)
 5. **No auto-rebuild** — perlu manual sync_docs + ingest
 6. **Bahasa campuran** — dokumentasi ID/EN, query keduanya
 
@@ -171,7 +165,7 @@ Object dengan nodes dan edges:
 
 - [ ] Semantic chunk search dengan embedding (sentence-transformers)
 - [ ] Indeks AI agent docs (`docs/ai-agents/`)
-- [ ] Graph extraction dengan LLM untuk akurasi lebih tinggi
+
 - [ ] UI Streamlit untuk browsing knowledge base
 - [ ] Auto-rebuild via git hook
 - [ ] Caching query untuk pertanyaan berulang

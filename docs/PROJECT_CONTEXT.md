@@ -11,5 +11,5 @@ This sub-project is a lightweight Retrieval-Augmented Generation (RAG) system bu
 ## Goals
 - Allow the AI Agent to reason about the user's project holistically.
 - Map entities (Tables, Controllers, Models, Routes) and relationships.
-- Answer queries using an LLM (currently Anthropic/Claude) given context extracted from the graph.
+- Provide relevant context extracted from the graph to assist the user or an external AI agent.
 - Keep the design minimal: No complex graph databases like Neo4j, no complex embedding vector DBs yet. Local JSON files are the single source of truth.

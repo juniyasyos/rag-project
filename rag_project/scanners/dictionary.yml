@@ -1,0 +1,65 @@
+intents:
+  project_overview:
+    - "jelaskan project"
+    - "apa itu"
+    - "tentang"
+    - "ringkasan"
+    - "overview"
+    - "tujuan"
+  command_lookup:
+    - "command"
+    - "perintah"
+    - "migrate"
+    - "setup"
+    - "install"
+    - "menjalankan"
+    - "start"
+    - "artisan"
+    - "run"
+  architecture_analysis:
+    - "arsitektur"
+    - "architecture"
+    - "struktur"
+    - "modular"
+    - "monolith"
+    - "module"
+    - "alur"
+    - "flow"
+    - "desain"
+    - "database"
+    - "skema"
+  troubleshooting:
+    - "error"
+    - "bug"
+    - "gagal"
+    - "masalah"
+    - "issue"
+    - "troubleshoot"
+    - "log"
+  docs_lookup:
+    - "dokumen"
+    - "docs"
+    - "file"
+    - "sumber"
+  api_reference:
+    - "api"
+    - "endpoint"
+    - "route"
+    - "controller"
+    - "response"
+    - "request"
+
+expanded_keys:
+  "migrate":
+    - "artisan migrate"
+    - "database"
+    - "schema"
+    - "table"
+  "error":
+    - "log"
+    - "bug"
+    - "exception"
+  "api":
+    - "controller"
+    - "endpoint"
+    - "json"

@@ -1,7 +1,8 @@
-import os
+from pathlib import Path
 from dotenv import load_dotenv
-from rag_project.paths import RAG_DIR
 
 def load_config():
-    load_dotenv(RAG_DIR / ".env")
-    load_dotenv(RAG_DIR / ".env.example")
+    """
+    Memuat variabel environment dari file .env di direktori saat ini.
+    """
+    load_dotenv(Path.cwd() / ".env")

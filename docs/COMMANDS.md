@@ -9,9 +9,9 @@ Use the CLI by running `python -m rag_project.cli <command> [args]`.
 - `refresh` / `rebuild`: Runs `sync` -> `ingest` -> `scan` sequentially, completely rebuilding the knowledge base.
 
 ## Search and Query
-- `search <query> [--domain <domain>]`: Semantic or keyword search. Same as `query`.
-- `query <query> [--domain <domain>]`: Interactively ask the LLM a question based on indexed knowledge.
-- `context <query> [--domain <domain>]`: Returns raw formatted context (JSON/Text) that would be passed to the LLM without actually querying it.
+- `search <query> [--domain <domain>]`: Semantic or keyword search.
+- `query <query> [--domain <domain>]`: Query the knowledge base to extract relevant context.
+- `context <query> [--domain <domain>]`: Returns raw formatted context (JSON/Text) extracted from the graph.
 - `graph <query>`: Searches for a node in the graph by label or ID and prints its connections.
 - `inspect <node_id>`: Prints the detailed exact match node properties and all edges connected to it.
 

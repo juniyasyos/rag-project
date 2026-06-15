@@ -1,5 +1,15 @@
 import os
 import re
+import yaml
+from rag_project.paths import CUSTOM_DICTIONARY_PATH, DICTIONARY_PATH
+
+def load_dictionary():
+    dict_path = CUSTOM_DICTIONARY_PATH if CUSTOM_DICTIONARY_PATH.exists() else DICTIONARY_PATH
+    try:
+        with open(dict_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
 
 
 # ============================================================
@@ -36,21 +46,12 @@ def extract_query_keys(question: str) -> list[str]:
 
 def detect_intent(question: str) -> str:
     q = question.lower()
+    dictionary = load_dictionary()
+    intents = dictionary.get("intents", {})
 
-    if any(x in q for x in ["rag", "graphrag", "knowledge", "knowledge base", "librarian"]):
-        return "rag_usage"
-
-    if any(x in q for x in ["command", "perintah", "migrate", "migration", "setup", "install", "jalankan", "run"]):
-        return "command_lookup"
-
-    if any(x in q for x in ["arsitektur", "architecture", "struktur", "modular", "monolith", "module"]):
-        return "architecture_analysis"
-
-    if "jelaskan" in q and any(x in q for x in ["project", "proyek", "siimut"]):
-        return "project_overview"
-
-    if any(x in q for x in ["dokumen", "docs", "file", "sumber"]):
-        return "docs_lookup"
+    for intent_key, keywords in intents.items():
+        if any(x.lower() in q for x in keywords):
+            return intent_key
 
     return "docs_lookup"
 
@@ -64,49 +65,12 @@ def expand_keys(question: str, query_keys: list[str]) -> list[str]:
             if item not in expanded:
                 expanded.append(item)
 
-    if "siimut" in q:
-        add([
-            "SIIMUT",
-            "Sistem Indikator Mutu",
-            "Rumah Sakit",
-            "Laravel 12",
-            "Filament",
-            "Filament 3.2",
-            "modular monolith",
-            "app/Modules",
-            "PROJECT_STRUCTURE",
-            "PROJECT_CONTEXT",
-        ])
+    dictionary = load_dictionary()
+    expanded_rules = dictionary.get("expanded_keys", {})
 
-    if any(x in q for x in ["command", "perintah", "migrate", "migration", "setup", "install", "jalankan", "run"]):
-        add([
-            "COMMANDS.md",
-            "artisan",
-            "php artisan",
-            "php artisan migrate",
-            "database",
-            "setup development",
-        ])
-
-    if any(x in q for x in ["arsitektur", "architecture", "struktur", "modular", "monolith", "module"]):
-        add([
-            "PROJECT_STRUCTURE.md",
-            "modular monolith",
-            "app/Modules",
-            "Domain layer",
-            "Laravel structure",
-        ])
-
-    if any(x in q for x in ["rag", "graphrag", "knowledge", "knowledge base", "librarian"]):
-        add([
-            "GraphRAG",
-            "RAG",
-            "knowledge base",
-            "chunks",
-            "graph",
-            "librarian",
-            "handoff",
-        ])
+    for key_pattern, add_items in expanded_rules.items():
+        if key_pattern.lower() in q:
+            add(add_items)
 
     return expanded
 

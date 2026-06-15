@@ -55,14 +55,8 @@ rag-project refresh
 # Menghasilkan context string untuk agent
 rag-project context "database setup"
 
-# Melakukan query dengan mode SLM (Pustakawan Router)
-rag-project query "jelaskan project siimut" --mode librarian
-
-# Melakukan query agar dijawab lokal jika sederhana
-rag-project query "apa command menjalankan project?" --mode local
-
-# Mengeluarkan prompt yang siap dikirim ke LLM besar (Handoff)
-rag-project query "analisa arsitektur siimut" --mode handoff
+# Melakukan query untuk mengambil konteks yang relevan (sebagai Pustakawan)
+rag-project query "jelaskan project siimut"
 
 # Mencari file/chunk spesifik (bisa difilter berdasarkan domain)
 rag-project search "user authentication" --domain services
@@ -100,11 +94,7 @@ AI agent dapat berinteraksi dengan tool ini untuk mengeksplorasi arsitektur proj
 3. **Graph Exploration**: `rag-project graph "model-user"` untuk melihat apa saja yang berhubungan dengan model User.
 4. **Detail Node**: `rag-project inspect "route-get-api-users"` untuk melihat relasi persis.
 
-### Mode Query (SLM Lokal)
-AI agent juga dapat memanggil RAG dengan SLM lokal (sebagai *Pustakawan* atau *Router*) menggunakan flag `--mode`:
-- `--mode librarian` (default): Menghasilkan output **JSON murni** yang merangkum niat pengguna (intent), dokumen relevan, dan mengambil keputusan apakah pertanyaan cukup dijawab lokal atau perlu diserahkan ke LLM besar. Sangat berguna sebagai *preprocessing/routing* untuk agen AI Anda!
-- `--mode local`: SLM akan mencoba menjawab langsung pertanyaan tersebut berdasarkan konteks RAG.
-- `--mode handoff`: Mengeluarkan prompt teks (Prompt template) yang sudah dirangkai dari pertanyaan *user* dan dokumen RAG terpilih, siap untuk disalin-tempel/dikirimkan ke LLM besar (seperti GPT-4 atau Claude).
+
 
 ## 📚 Dokumentasi Lanjutan
 
