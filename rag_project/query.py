@@ -10,11 +10,9 @@ def tokenize(text: str) -> set[str]:
     words = re.findall(r"[a-z0-9-]+", text.lower())
     return {w for w in words if len(w) > 2}
 
-def score_chunks(query: str, query_keys: list[str], expanded_keys: list[str], dictionary: dict, chunks: list[dict], domain: str = None) -> list[tuple[float, dict]]:
+def score_chunks(query: str, query_keys: list[str], expanded_keys: list[str], preferred_sources: list[str], avoid_sources: list[str], chunks: list[dict], domain: str = None) -> list[tuple[float, dict]]:
     scored = []
     
-    preferred_sources = dictionary.get("preferred_sources", [])
-    avoid_sources = dictionary.get("avoid_sources", [])
     q_lower = query.lower()
     
     for chunk in chunks:
@@ -153,11 +151,18 @@ def load_data():
 
 def run_context(question: str, domain: str = None) -> str:
     chunks, graph = load_data()
-    from rag_project.llm import extract_query_keys, expand_keys, load_dictionary
+    from rag_project.llm import extract_query_keys, detect_intent, expand_keys, load_dictionary
     dictionary = load_dictionary()
     qk = extract_query_keys(question)
     ek = expand_keys(question, qk)
-    top_chunks = score_chunks(question, qk, ek, dictionary, chunks, domain)
+    intent = detect_intent(question)
+    
+    intents = dictionary.get("intents", {})
+    intent_data = intents.get(intent, {})
+    preferred_sources = intent_data.get("preferred_sources", [])
+    avoid_sources = intent_data.get("avoid_sources", [])
+    
+    top_chunks = score_chunks(question, qk, ek, preferred_sources, avoid_sources, chunks, domain)
     rel_nodes, _ = score_graph(question, graph, domain)
     return build_context(top_chunks, rel_nodes)
 
@@ -174,7 +179,12 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
     intent = detect_intent(question)
     expanded_keys = expand_keys(question, query_keys)
     
-    top_chunks = score_chunks(question, query_keys, expanded_keys, dictionary, chunks, domain)
+    intents = dictionary.get("intents", {})
+    intent_data = intents.get(intent, {})
+    preferred_sources = intent_data.get("preferred_sources", [])
+    avoid_sources = intent_data.get("avoid_sources", [])
+    
+    top_chunks = score_chunks(question, query_keys, expanded_keys, preferred_sources, avoid_sources, chunks, domain)
     rel_nodes, rel_edges = score_graph(question, graph, domain)
     context = build_context(top_chunks, rel_nodes)
     

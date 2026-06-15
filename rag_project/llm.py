@@ -45,9 +45,19 @@ def extract_query_keys(question: str) -> list[str]:
 def detect_intent(question: str) -> str:
     q = question.lower()
     dictionary = load_dictionary()
+    priority = dictionary.get("priority", [])
     intents = dictionary.get("intents", {})
 
-    for intent_key, keywords in intents.items():
+    for intent_key in priority:
+        intent_data = intents.get(intent_key, {})
+        keywords = intent_data.get("phrases", [])
+        if any(x.lower() in q for x in keywords):
+            return intent_key
+
+    for intent_key, intent_data in intents.items():
+        if intent_key in priority:
+            continue
+        keywords = intent_data.get("phrases", [])
         if any(x.lower() in q for x in keywords):
             return intent_key
 

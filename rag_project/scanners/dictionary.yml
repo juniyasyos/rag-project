@@ -1,102 +1,286 @@
+priority:
+  - troubleshooting
+  - command_lookup
+  - service_lookup
+  - data_model_lookup
+  - api_reference
+  - architecture_analysis
+  - rag_usage
+  - project_overview
+  - docs_lookup
+
 intents:
   project_overview:
-    - "jelaskan project siimut"
-    - "jelaskan project"
-    - "apa itu"
-    - "tentang"
-    - "ringkasan"
-  service_lookup:
-    - "service"
-    - "layanan"
-    - "logic"
-    - "bisnis"
-    - "business logic"
-  data_model_lookup:
-    - "struktur data"
-    - "unit kerja"
-    - "tabel"
-    - "model"
-    - "database schema"
+    phrases:
+      - "jelaskan project"
+      - "jelaskan proyek"
+      - "apa itu siimut"
+      - "tentang siimut"
+      - "ringkasan project"
+      - "overview project"
+      - "tujuan project"
+      - "project siimut"
+    route: "ai_agent"
+    preferred_sources:
+      - "README.md"
+      - "docs/PROJECT_CONTEXT.md"
+      - "docs/PROJECT_STRUCTURE.md"
+      - "docs/SERVICES.md"
+      - "docs/AI_AGENT_USAGE.md"
+    avoid_sources:
+      - "docs/releases/"
+      - "database/migrations/"
+      - "app/Services/"
+      - "app/Models/"
+
   command_lookup:
-    - "command"
-    - "migrate"
-    - "perintah"
-    - "artisan"
-    - "setup"
-    - "install"
-    - "menjalankan"
-    - "run"
-  rag_usage:
-    - "rag"
-    - "graphrag"
-    - "knowledge"
-    - "pustakawan"
-    - "librarian"
+    phrases:
+      - "command"
+      - "perintah"
+      - "migrate"
+      - "migration"
+      - "setup"
+      - "install"
+      - "menjalankan"
+      - "jalankan"
+      - "start"
+      - "artisan"
+      - "run"
+      - "serve"
+      - "composer"
+      - "npm"
+      - "bun"
+    route: "ai_agent"
+    preferred_sources:
+      - "docs/COMMANDS.md"
+      - "COMMANDS.md"
+      - "README.md"
+      - "docs/DEVELOPMENT.md"
+    avoid_sources:
+      - "database/migrations/"
+      - "app/Services/"
+
+  architecture_analysis:
+    phrases:
+      - "arsitektur"
+      - "architecture"
+      - "desain sistem"
+      - "modular"
+      - "monolith"
+      - "modular monolith"
+      - "module"
+      - "modul"
+      - "alur aplikasi"
+      - "flow aplikasi"
+      - "struktur project"
+      - "struktur folder"
+    route: "ai_agent"
+    preferred_sources:
+      - "docs/PROJECT_STRUCTURE.md"
+      - "docs/PROJECT_CONTEXT.md"
+      - "docs/DECISIONS.md"
+      - "docs/SERVICES.md"
+      - "docs/KNOWN_ISSUES.md"
+    avoid_sources:
+      - "database/migrations/"
+
+  service_lookup:
+    phrases:
+      - "service"
+      - "services"
+      - "service siimut"
+      - "daftar service"
+      - "service apa saja"
+      - "business logic"
+      - "logic aplikasi"
+    route: "ai_agent"
+    preferred_sources:
+      - "docs/SERVICES.md"
+      - "app/Services/"
+      - "docs/planing/"
+    avoid_sources:
+      - "database/migrations/"
+
+  data_model_lookup:
+    phrases:
+      - "struktur data"
+      - "data unit kerja"
+      - "unit kerja"
+      - "model"
+      - "models"
+      - "relasi data"
+      - "relasi tabel"
+      - "schema"
+      - "skema"
+      - "database"
+      - "table"
+      - "tabel"
+      - "migration"
+      - "kolom"
+      - "field"
+    route: "ai_agent"
+    preferred_sources:
+      - "app/Models/"
+      - "database/migrations/"
+      - "docs/PROJECT_STRUCTURE.md"
+      - "docs/DECISIONS.md"
+    avoid_sources:
+      - "docs/releases/"
+
   troubleshooting:
-    - "error"
-    - "bug"
-    - "gagal"
-    - "masalah"
-    - "issue"
-    - "troubleshoot"
-    - "log"
+    phrases:
+      - "error"
+      - "bug"
+      - "gagal"
+      - "masalah"
+      - "issue"
+      - "troubleshoot"
+      - "log"
+      - "exception"
+      - "kenapa"
+      - "tidak jalan"
+      - "crash"
+    route: "ai_agent"
+    preferred_sources:
+      - "docs/KNOWN_ISSUES.md"
+      - "docs/DECISIONS.md"
+      - "docs/CHANGELOG.md"
+      - "logs/"
+    avoid_sources:
+      - "docs/releases/"
+
   docs_lookup:
-    - "dokumen"
-    - "docs"
-    - "file"
-    - "sumber"
+    phrases:
+      - "dokumen"
+      - "docs"
+      - "file"
+      - "sumber"
+      - "letak"
+      - "lokasi"
+      - "ada dimana"
+      - "di mana"
+    route: "docs_only"
+    preferred_sources:
+      - "README.md"
+      - "docs/"
+    avoid_sources: []
+
   api_reference:
-    - "api"
-    - "endpoint"
-    - "route"
-    - "controller"
-    - "response"
-    - "request"
+    phrases:
+      - "api"
+      - "endpoint"
+      - "route"
+      - "controller"
+      - "request"
+      - "response"
+      - "json"
+      - "payload"
+    route: "ai_agent"
+    preferred_sources:
+      - "routes/"
+      - "app/Http/Controllers/"
+      - "docs/API.md"
+    avoid_sources:
+      - "database/migrations/"
+
+  rag_usage:
+    phrases:
+      - "rag"
+      - "graphrag"
+      - "knowledge graph"
+      - "knowledge base"
+      - "librarian"
+      - "pustakawan"
+      - "chunk"
+      - "chunks"
+      - "ingest"
+      - "retrieval"
+      - "context pack"
+    route: "ai_agent"
+    preferred_sources:
+      - "RAG_GUIDE.md"
+      - "README.md"
+      - "docs/releases/"
+      - "rag-project/"
+    avoid_sources:
+      - "app/Services/"
+      - "database/migrations/"
 
 expanded_keys:
-  "migrate":
-    - "artisan migrate"
+  siimut:
+    - "SIIMUT"
+    - "Sistem Indikator Mutu"
+    - "Rumah Sakit"
+    - "mutu rumah sakit"
+    - "indikator mutu"
+
+  project:
+    - "project overview"
+    - "PROJECT_CONTEXT"
+    - "PROJECT_STRUCTURE"
+    - "README"
+
+  arsitektur:
+    - "architecture"
+    - "modular monolith"
+    - "app/Modules"
+    - "domain layer"
+    - "service layer"
+
+  struktur:
+    - "PROJECT_STRUCTURE"
+    - "folder structure"
+    - "app/Modules"
+    - "Laravel structure"
+
+  service:
+    - "App\\Services"
+    - "service layer"
+    - "business logic"
+    - "Core services"
+    - "Chart services"
+    - "Reporting services"
+
+  unit:
+    - "UnitKerja"
+    - "unit kerja"
+    - "LaporanImut"
+    - "ImutData"
+    - "reporting"
+    - "chart data"
+
+  kerja:
+    - "UnitKerja"
+    - "unit kerja"
+
+  data:
+    - "model"
     - "database"
     - "schema"
     - "table"
-  "rag":
-    - "GraphRAG"
-    - "knowledge base"
-    - "chunks"
-    - "graph"
-    - "librarian"
-  "error":
+    - "migration"
+
+  migrate:
+    - "php artisan migrate"
+    - "artisan migrate"
+    - "database migration"
+    - "schema"
+    - "table"
+
+  api:
+    - "controller"
+    - "endpoint"
+    - "route"
+    - "request"
+    - "response"
+    - "json"
+
+  error:
+    - "KNOWN_ISSUES"
     - "log"
     - "bug"
     - "exception"
-    - "KNOWN_ISSUES"
-  "api":
-    - "controller"
-    - "endpoint"
-    - "json"
-  "docker":
-    - "docker-compose"
-    - "container"
-    - "image"
-    - "deployment"
-  "service":
-    - "app/Services"
-    - "business logic"
-  "struktur data":
-    - "app/Models"
-    - "database/migrations"
-    - "schema"
-
-preferred_sources:
-  - "README.md"
-  - "PROJECT_CONTEXT.md"
-  - "ARCHITECTURE.md"
-  - "AGENTS.md"
-
-avoid_sources:
-  - "vendor/"
-  - "node_modules/"
-  - ".git/"
+    - "workaround"
 
 stopwords:
   - "apa"
@@ -114,12 +298,12 @@ stopwords:
   - "dong"
   - "nih"
   - "ya"
-  - "saya"
-  - "aku"
-  - "kamu"
-  - "kau"
+  - "gmn"
+  - "gimana"
+  - "bagaimana"
+  - "saja"
+  - "aja"
   - "tolong"
   - "coba"
-  - "bantu"
-  - "beritahu"
-  - "jelaskan"
+  - "saya"
+  - "aku"
