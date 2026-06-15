@@ -197,7 +197,6 @@ def build_librarian_metadata(
         "relevant_docs": relevant_docs[:5],
         "relevant_topics": relevant_topics[:8],
         "context_pack": context_pack,
-        "notes": "Metadata dan konteks siap dikirim ke AI agent. RAG tidak menjawab final.",
     }
 
 

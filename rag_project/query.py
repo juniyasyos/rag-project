@@ -233,8 +233,6 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
             confidence = 0.60
         else:
             confidence = 0.4
-            
-    notes = "Metadata dan konteks siap dikirim ke AI agent. RAG tidak menjawab final."
     
     final_data = {
         "user_query": question,
@@ -246,7 +244,6 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
         "relevant_docs": relevant_docs,
         "relevant_topics": relevant_topics,
         "context_pack": context_pack,
-        "notes": notes
     }
     
     elapsed = time.time() - start_time
