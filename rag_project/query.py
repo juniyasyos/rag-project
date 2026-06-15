@@ -10,44 +10,49 @@ def tokenize(text: str) -> set[str]:
     words = re.findall(r"[a-z0-9-]+", text.lower())
     return {w for w in words if len(w) > 2}
 
-def score_chunks(query: str, chunks: list[dict], domain: str = None) -> list[tuple[float, dict]]:
-    q_tokens = tokenize(query)
-    q_words = list(q_tokens)
+def score_chunks(query: str, query_keys: list[str], expanded_keys: list[str], dictionary: dict, chunks: list[dict], domain: str = None) -> list[tuple[float, dict]]:
     scored = []
     
-    # Filter RAG-specific docs and files to avoid recursion unless query is about RAG
-    is_rag_query = any(k in q_tokens for k in ['rag', 'graphrag', 'pustakawan', 'llm', 'ai-agent', 'ai'])
-    ignore_keywords = ['releases/v', 'v0.', 'contoh query', 'contoh_query', 'debug']
-    if not is_rag_query:
-        ignore_keywords.extend(['rag-project', 'rag_', 'ai-agent/rag', 'ai_agent_usage'])
+    preferred_sources = dictionary.get("preferred_sources", [])
+    avoid_sources = dictionary.get("avoid_sources", [])
+    q_lower = query.lower()
     
     for chunk in chunks:
         source_file = chunk.get("source_file", "").lower()
-        if any(ik in source_file for ik in ignore_keywords):
-            continue
-            
         if domain and domain.lower() not in chunk.get("domain", source_file):
             continue
             
-        c_tokens = tokenize(chunk["content"])
+        content_lower = chunk["content"].lower()
         heading_lower = chunk.get("heading", "").lower()
+        full_text = heading_lower + "\n" + content_lower
         
-        # 1. Exact Heading/Source Boost (Sangat Kuat)
-        heading_boost = sum(10 for qt in q_words if qt in heading_lower)
-        source_boost = sum(15 for qt in q_words if qt in source_file)
+        score = 0
         
-        # 2. Strong Overlap (Overlap pada kata yang lebih panjang/unik)
-        strong_overlap = sum(3 for qt in q_tokens if qt in c_tokens and len(qt) > 4)
-        
-        # 3. Standard Overlap
-        overlap = len(q_tokens & c_tokens)
-        
-        # 4. Partial Match
-        partial = sum(0.5 for qt in q_words for ct in c_tokens if (qt in ct or ct in qt) and len(qt) > 3)
-        
-        score = overlap + strong_overlap + partial + heading_boost + source_boost
+        # 1. Exact phrase boost (+10)
+        if q_lower in full_text and len(q_lower) > 4:
+            score += 10
+            
+        # 2. Keyword boost (+3)
+        for k in query_keys:
+            if k.lower() in full_text:
+                score += 3
+                
+        # 3. Expanded key boost (+2)
+        for ek in expanded_keys:
+            if ek.lower() in full_text:
+                score += 2
+                
+        # 4. Preferred Source boost (+5)
+        if any(ps.lower() in source_file for ps in preferred_sources):
+            score += 5
+            
+        # 5. Avoid Source penalty (-5)
+        if any(av.lower() in source_file for av in avoid_sources):
+            score -= 5
+            
         if score > 0:
             scored.append((score, chunk))
+            
     scored.sort(key=lambda x: -x[0])
     return scored[:TOP_K]
 
@@ -148,7 +153,11 @@ def load_data():
 
 def run_context(question: str, domain: str = None) -> str:
     chunks, graph = load_data()
-    top_chunks = score_chunks(question, chunks, domain)
+    from rag_project.llm import extract_query_keys, expand_keys, load_dictionary
+    dictionary = load_dictionary()
+    qk = extract_query_keys(question)
+    ek = expand_keys(question, qk)
+    top_chunks = score_chunks(question, qk, ek, dictionary, chunks, domain)
     rel_nodes, _ = score_graph(question, graph, domain)
     return build_context(top_chunks, rel_nodes)
 
@@ -158,7 +167,14 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
         print("No data found. Run scan or ingest first.")
         return
     
-    top_chunks = score_chunks(question, chunks, domain)
+    from rag_project.llm import extract_query_keys, detect_intent, expand_keys, load_dictionary
+    dictionary = load_dictionary()
+    
+    query_keys = extract_query_keys(question)
+    intent = detect_intent(question)
+    expanded_keys = expand_keys(question, query_keys)
+    
+    top_chunks = score_chunks(question, query_keys, expanded_keys, dictionary, chunks, domain)
     rel_nodes, rel_edges = score_graph(question, graph, domain)
     context = build_context(top_chunks, rel_nodes)
     
@@ -166,7 +182,6 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
         print("=== DEBUG: TOP CHUNKS ===")
         for score, chunk in top_chunks:
             print(f"[{score}] {chunk['source_file']} - {chunk.get('heading', 'NO HEADING')}")
-            # print(f"Preview: {chunk['content'][:100]}...\n")
         print("=== DEBUG: RELEVANT NODES ===")
         for node in rel_nodes:
             print(f"- {node['id']} ({node['label']})")
@@ -174,56 +189,7 @@ def run_query(question: str, domain: str = None, mode: str = "librarian", debug:
     
     start_time = time.time()
     
-    # Jalankan SLM untuk mengerti semantik (hanya mengekstrak intent & query_keys)
-    answer = llm_librarian(question, context)
-    
-    # Kumpulkan fallback rule-based
-    q_lower = question.lower()
-    fallback_query_keys = [w for w in q_lower.split() if len(w) > 2]
-    
-    # 2. Intent - Kompleks Rule-Based
-    from rag_project.llm import load_dictionary
-    dictionary = load_dictionary()
-    intent_rules = dictionary.get("intents", {})
-    
-    fallback_intent = "docs_lookup"
-    for intent_key, keywords in intent_rules.items():
-        if any(k in q_lower for k in keywords):
-            fallback_intent = intent_key
-            break
-        
-    query_keys = fallback_query_keys
-    intent = fallback_intent
-    
-    # SLM Dinonaktifkan sementara, kita hanya pakai deterministic rules.
-    # Namun struktur try/except tetap dijaga untuk keamanan API.
-    if answer:
-        try:
-            json_match = re.search(r'\{.*\}', answer.replace('\n', ' '), re.DOTALL)
-            if json_match:
-                slm_data = json.loads(json_match.group(0))
-            else:
-                slm_data = json.loads(answer)
-                
-            if "query_keys" in slm_data and isinstance(slm_data["query_keys"], list) and len(slm_data["query_keys"]) > 0:
-                query_keys = slm_data["query_keys"]
-            if "intent" in slm_data and slm_data["intent"].strip():
-                intent = slm_data["intent"]
-        except:
-            pass # Fallback digunakan jika parsing gagal
-            
-    # 3. Expanded Keys (Kompleks Deterministic)
-    expanded_keys = []
-    combined_keys = " ".join(query_keys).lower() + " " + q_lower
-    
-    expanded_keys_rules = dictionary.get("expanded_keys", {})
-    
-    for kw, exp_keys in expanded_keys_rules.items():
-        if kw in combined_keys:
-            expanded_keys.extend(exp_keys)
-            
-    # Hapus duplikat dari expanded_keys dengan menjaga urutan
-    expanded_keys = list(dict.fromkeys(expanded_keys))
+    combined_keys = " ".join(query_keys).lower() + " " + question.lower()
         
     # 4. Route (Deterministic)
     if any(k in combined_keys for k in ["dimana", "lokasi", "daftar", "sumber", "file"]):

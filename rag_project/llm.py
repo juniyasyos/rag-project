@@ -21,21 +21,19 @@ def load_dictionary():
 # ============================================================
 
 
-STOPWORDS = {
-    "apa", "itu", "yang", "di", "ke", "dari", "dan", "atau",
-    "untuk", "dengan", "pada", "dalam", "dong", "nih", "ya",
-    "saya", "aku", "kamu", "kau", "tolong"
-}
-
 
 def extract_query_keys(question: str) -> list[str]:
     text = question.lower().strip()
-
     words = re.findall(r"[a-zA-Z0-9_\-]+", text)
+
+    dictionary = load_dictionary()
+    custom_stopwords = set(dictionary.get("stopwords", []))
+    default_stopwords = {"apa", "itu", "yang", "di", "ke", "dari", "dan", "atau"}
+    stopwords = custom_stopwords if custom_stopwords else default_stopwords
 
     keys = []
     for word in words:
-        if word in STOPWORDS:
+        if word in stopwords:
             continue
         if len(word) < 2:
             continue
