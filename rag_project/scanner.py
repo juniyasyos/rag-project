@@ -137,6 +137,7 @@ def run_scan():
     nodes = {}
     edges = []
     chunks = []
+    files_scanned = 0
     
     scanners_dir = Path(__file__).parent / "scanners"
     configs = []
@@ -166,6 +167,7 @@ def run_scan():
                     continue
                 if target_path.is_file():
                     scan_file_with_config(target_path, path_str, domain, domain_config, nodes, edges, chunks)
+                    files_scanned += 1
                 else:
                     for root, _, files in os.walk(target_path):
                         for file in files:
@@ -173,6 +175,7 @@ def run_scan():
                                 file_path = Path(root) / file
                                 rel_path = file_path.relative_to(PROJECT_ROOT).as_posix()
                                 scan_file_with_config(file_path, rel_path, domain, domain_config, nodes, edges, chunks)
+                                files_scanned += 1
                             
     if CHUNKS_PATH.exists():
         try:
@@ -212,4 +215,4 @@ def run_scan():
     with open(GRAPH_PATH, "w", encoding="utf-8") as f:
         json.dump(final_graph, f, indent=2, ensure_ascii=False)
         
-    console.print(f"  Scanned {len(chunks)} files. Found {len(nodes)} entities and {len(edges)} relations.")
+    console.print(f"  Scanned {files_scanned} files. Found {len(nodes)} entities and {len(edges)} relations.")
