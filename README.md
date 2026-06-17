@@ -1,106 +1,88 @@
-# Project Intelligence RAG
+# Project Intelligence RAG (SIIMUT Caveman Librarian)
 
-**Project Intelligence RAG** adalah sebuah package/tool generic untuk membangun *Retrieval-Augmented Generation* (RAG) secara lokal yang ringan dan berbasis file. Tool ini dirancang untuk dapat digunakan oleh berbagai macam project untuk membantu AI agent memahami konteks project secara keseluruhan, bukan hanya dari dokumentasi, melainkan juga dari source code dan konfigurasi.
+**Project Intelligence RAG** adalah sebuah *CLI tool* berbasis Python yang dirancang khusus sebagai **"Pustakawan"** untuk memetakan arsitektur proyek Laravel secara lokal. Tool ini mengekstrak entitas dan relasi dari *source code* dan dokumentasi ke dalam *Knowledge Graph* berformat JSON, menghemat **hingga 99%** konsumsi *context window* LLM.
 
-## 🌟 Problem yang Diselesaikan
+## 🌟 Desain Arsitektur & Filosofi
 
-AI agent sering kali perlu membaca banyak dokumentasi dan source code untuk memahami arsitektur sebuah project. Mengirim seluruh file source atau folder dokumentasi secara langsung sangat tidak efisien dan dapat dengan mudah melampaui batas token *context window* pada LLM.
+Tool ini beroperasi dengan prinsip **"Caveman Librarian"** — murni sebagai mesin *retrieval & indexing* tanpa menggunakan LLM lokal untuk menghasilkan jawaban (NLG di-disable). Semua pemrosesan berbasis *pattern matching* (Regex via YAML) bukan AST parsing, sehingga sangat cepat dan ringan.
 
-Tool ini menyelesaikan masalah tersebut dengan melakukan *multi-domain scanning* (docs, database, routes, services, models, config/docker) dan membangun *knowledge graph* secara lokal. AI agent dapat mencari entitas (Table, Column, Migration, Route, Controller, Service, Model, dsb) atau konteks spesifik tanpa harus membaca seluruh file project.
+**Karakteristik Kunci:**
+- **Zero Database:** Hanya menggunakan `chunks.json` dan `graph.json` lokal. Tidak ada dependensi Neo4j atau Vector DB.
+- **Multi-Domain Scanning:** Mendeteksi 20+ domain Laravel (Models, Services, Controllers, Routes, Migrations, Policies, Filament, Livewire, Console Commands, dll).
+- **Cross-Domain Relations:** Mampu mendeteksi injeksi dependensi (`depends_on`) dan penggunaan model lintas domain (`uses_model`, `authorizes`, `seeds`).
+- **Stateless:** Kode *parser* terpisah dari penyimpanan data (yang diletakkan di `.ai/rag/output/` pada direktori proyek target).
 
-## 🔄 Flow Sederhana
+## 🚀 Performa & Efisiensi Konteks
 
-Tool ini bekerja dengan alur yang modular:
+Dibandingkan dengan pencarian konvensional (Grep) yang memuat seluruh *source code* ke dalam *context window* LLM, tool ini secara ekstrem meringkas muatan dengan berfokus menyuplai **metadata arsitektur dan relasi**:
 
-`project files` → `scan/sync/ingest` → `index/graph` → `agent context`
+| Metrik | Pencarian Konvensional (Grep) | Pendekatan Pustakawan (RAG Project) |
+|--------|------------------|-------------------|
+| **Payload ke LLM** | Menyuapkan seluruh isi *file* kode mentah. | Menyuapkan ringkasan relasi (node & *edges*). |
+| **Kebutuhan Token** | Sangat besar (bisa > 20.000 token). | Sangat kecil (dibatasi ketat ~150 hingga 500 token). |
+| **Fungsi Ideal** | Analisis logika fungsi spesifik & *debugging*. | Pemetaan arsitektur & *impact analysis* tahap awal. |
 
-1. **Scan & Sync**: Memindai berbagai domain di project (docs, app/Models, app/Services, database/migrations, routes, config) tanpa dependensi berat.
-2. **Ingest**: Mengekstrak entitas dan memecah konten menjadi *chunks* serta membangun *knowledge graph* sederhana.
-3. **Index/Graph**: Menyimpan hasil pemrosesan secara lokal berbasis file (JSON) di dalam folder `.ai/rag` milik project target.
-4. **Agent Context**: Menyediakan antarmuka CLI yang dapat digunakan AI agent untuk querying atau melihat struktur graph.
+*Kesimpulan: Tool ini memangkas konsumsi token di fase awal (discovery) dengan membuang logika kode dan berfokus murni pada pemetaan struktur.*
 
-## 🚀 Quick Start
+## 🛠️ Instalasi & Setup
 
-### 1. Install secara Lokal
-
-Clone repository package ini dan install:
-
+1. **Install Package (Global/Venv):**
 ```bash
+cd rag-project
 pip install -e .
 ```
 
-### 2. Setup di Project Target
-
-Masuk ke direktori project target apa pun yang ingin diindeks:
-
+2. **Masuk ke Target Project (Laravel):**
 ```bash
-cd /path/to/target-project
+cd /path/to/laravel-project
 ```
 
-### 3. Build RAG & Cari Konteks
-
-Jalankan perintah berikut dari dalam direktori project target:
-
+3. **Build Knowledge Graph:**
 ```bash
-# Melakukan scanning secara menyeluruh (multi-domain: code, config, docs)
-rag-project scan
-
-# Menyalin markdown manual jika perlu
-rag-project sync
-rag-project ingest
-
-# Gabungan scan, sync, ingest (rebuild ulang)
+# Melakukan scanning code & ingest docs secara penuh
 rag-project refresh
+```
 
-# Menghasilkan context string untuk agent
-rag-project context "database setup"
+## 🤖 Perintah CLI (Untuk AI Agent & Developer)
 
-# Melakukan query untuk mengambil konteks yang relevan (sebagai Pustakawan)
-rag-project query --intent project_overview
+Tool ini berjalan dari *root* direktori proyek target.
 
-# Melakukan query spesifik dengan target entity dan keywords
-rag-project query --intent service_lookup --entity LaporanImut --key migrate
+### 1. Eksplorasi Arsitektur (Graph)
+```bash
+# Menampilkan statistik jumlah node/edge di proyek
+rag-project graph stats
 
-# Mencari file/chunk spesifik (bisa difilter berdasarkan domain)
-rag-project search --intent docs_lookup --subject "user authentication" --domain services
+# Mencari node berdasarkan keyword (contoh: "user")
+rag-project graph "user"
 
-# Melihat keseluruhan atau mencari sebagian dari Knowledge Graph
-rag-project graph "service"
-
-# Menginspeksi satu entitas Node secara detail
+# Melihat KESELURUHAN relasi (inbound & outbound) dari satu entitas
 rag-project inspect "model-user"
+rag-project inspect "service-laporanimutservice"
 ```
 
-## 📁 Struktur Penyimpanan (di Project Target)
+### 2. Keyword & Intent-Based Querying
+```bash
+# Mendapatkan konteks terstruktur untuk AI Agent (menggunakan intent routing & keyword scoring)
+rag-project query --intent architecture_analysis --subject "Laporan Imut"
 
-Package ini menyimpan seluruh data *index* dan *cache* di dalam *storage root* `.ai/rag/` dari project target. Data pengguna sama sekali **tidak** disimpan di dalam package ini.
-
-```text
-target-project/
-├── .ai/
-│   └── rag/                # Folder penyimpanan hasil RAG (output_dir)
-│       ├── input/          # Salinan file markdown (jika disinkronisasi manual)
-│       └── output/
-│           ├── chunks.json # Data potongan dokumen & kode
-│           └── graph.json  # Data entitas & relasi (Table, Route, Model, Service, dll)
-├── docs/                   # Folder dokumentasi asli milik project
-├── app/                    # Folder kode aplikasi
-└── config/                 # Folder konfigurasi
+# Intent yang tersedia:
+# project_overview, architecture_analysis, service_lookup, data_model_lookup,
+# command_lookup, api_reference, troubleshooting, docs_lookup
 ```
 
-## 🤖 Cara AI Agent Memakai File Hasil Context
+### 3. Pencarian Raw
+```bash
+# Mencari string spesifik dalam output RAG
+rag-project search --intent docs_lookup --subject "authentication"
+```
 
-AI agent dapat berinteraksi dengan tool ini untuk mengeksplorasi arsitektur project:
+## 📁 Struktur Data Graph
 
-1. **Pencarian Global**: `rag-project search "jwt"` untuk melihat semua chunk code & docs terkait JWT.
-2. **Pencarian Spesifik Domain**: `rag-project search "create user" --domain routes` untuk membatasi pencarian di API/Web routes.
-3. **Graph Exploration**: `rag-project graph "model-user"` untuk melihat apa saja yang berhubungan dengan model User.
-4. **Detail Node**: `rag-project inspect "route-get-api-users"` untuk melihat relasi persis.
+Output disimpan di `target-project/.ai/rag/output/`.
 
+- **Nodes (`graph.json`):** Entitas seperti `Table`, `Model`, `Controller`, `Service`, `Route`, `Policy`, `FilamentResource`.
+- **Edges (`graph.json`):** Relasi seperti `has_column`, `uses_model`, `depends_on`, `handled_by`, `creates_table`, `authorizes`, `seeds`.
+- **Chunks (`chunks.json`):** Pecahan dokumentasi *markdown* yang telah di-index.
 
-
-## 📚 Dokumentasi Lanjutan
-
-- [Struktur Internal Package (STRUCTURE.md)](docs/STRUCTURE.md)
-- [Panduan Penggunaan (USAGE.md)](docs/USAGE.md)
-- [Roadmap Pengembangan (ROADMAP.md)](docs/ROADMAP.md)
+---
+*Dikembangkan secara khusus untuk menganalisis arsitektur monolit Laravel kompleks seperti SIIMUT.*

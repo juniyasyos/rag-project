@@ -199,34 +199,3 @@ def build_librarian_metadata(
         "context_pack": context_pack,
     }
 
-
-# ============================================================
-# Compatibility stubs
-# Supaya import lama tidak langsung error.
-# Tapi tidak dipakai untuk jawab.
-# ============================================================
-
-
-def llm_librarian(question: str, context: str) -> str | None:
-    """
-    Deprecated.
-    Jangan pakai SLM untuk librarian.
-    Pakai build_librarian_metadata().
-    """
-    return None
-
-
-def llm_answer(question: str, context: str) -> str | None:
-    """
-    Disabled.
-    RAG tidak boleh menjawab lokal.
-    """
-    return None
-
-
-def llm_big_answer(question: str, context: str) -> str | None:
-    """
-    Disabled.
-    RAG tidak boleh auto-call LLM besar.
-    """
-    return None
